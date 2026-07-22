@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>呆呆扭蛋機 - 管理後台</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; background: #f8fafc; }
+        .field-label { font-size: 11px; font-weight: bold; color: #6b7280; margin-bottom: 2px; display: block; }
+        .field-input { width: 100%; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 6px 10px; font-size: 13px; font-weight: 600; }
+        .field-input:focus { outline: none; box-shadow: 0 0 0 2px #f472b6; }
+        .prize-card { background: white; border-radius: 20px; border: 1px solid #f1f5f9; box-shadow: 0 4px 12px rgba(0,0,0,0.04); padding: 16px; }
+        .shop-card { background: white; border-radius: 20px; border: 1px solid #e5e7eb; box-shadow: 0 4px 12px rgba(0,0,0,0.04); padding: 16px; }
+        .wallet-card { background: white; border-radius: 16px; border: 1px solid #f1f5f9; padding: 12px; margin-bottom: 8px; }
+        .pending-item { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 10px 14px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <!-- 🔒 管理員登入畫面 -->
+    <div id="loginScreen" class="max-w-sm mx-auto mt-24 bg-white rounded-3xl shadow-xl border border-white p-8 text-center">
+        <div class="text-3xl mb-2">🔐</div>
+        <h1 class="text-lg font-black text-slate-800 mb-1">呆呆扭蛋機・管理後台</h1>
+        <p class="text-xs text-gray-400 mb-6">請用管理員帳號登入</p>
+        <input type="email" id="adminEmailInput" placeholder="管理員 Email" class="field-input text-center mb-2">
+        <input type="password" id="adminPassInput" placeholder="密碼" class="field-input text-center mb-3">
+        <button id="loginBtn" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-sm transition-all">登入</button>
+        <p id="loginError" class="text-[11px] text-rose-500 mt-3 leading-relaxed"></p>
+        <p class="text-[11px] text-gray-400 mt-4 leading-relaxed">這個帳號需要先在 Firebase 主控台 > Authentication 建立，且它的 UID 必須被填進資料庫規則中才有管理權限。</p>
+    </div>
+
+    <!-- 🛠️ 管理主畫面 -->
+    <div id="adminScreen" class="hidden max-w-6xl mx-auto space-y-8">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+            <h1 class="text-xl md:text-2xl font-black text-slate-800">🛠️ 呆呆扭蛋機・管理後台</h1>
+            <div class="flex items-center gap-3">
+                <span class="text-xs text-gray-400">連線狀態：<span id="connStatus" class="font-bold text-emerald-500">連線中...</span></span>
+                <button id="closedToggleBtn" class="text-xs font-bold px-4 py-2 rounded-xl transition-all bg-gray-200 text-gray-500 hover:bg-gray-300">🔒 打烊模式：讀取中...</button>
+                <button id="logoutBtn" class="text-xs font-bold text-gray-400 hover:text-rose-500 transition-all">登出</button>
+            </div>
+        </div>
+
+        <!-- 📊 點數記錄 -->
+        <section class="bg-amber-50/70 rounded-3xl border border-amber-200 shadow p-5 md:p-6">
+            <h2 class="font-black text-amber-700 mb-4">📊 點數記錄</h2>
+            <div id="pendingPointsList"><p class="text-gray-400 text-sm">尚無點數記錄</p></div>
+        </section>
+
+        <!-- 🛍️ 兌換記錄 -->
+        <section class="bg-purple-50/70 rounded-3xl border border-purple-200 shadow p-5 md:p-6">
+            <h2 class="font-black text-purple-700 mb-4">🛍️ 兌換記錄</h2>
+            <div id="redeemRequestsList"><p class="text-gray-400 text-sm">尚無兌換記錄</p></div>
+        </section>
+
+        <!-- 📋 獎品管理 -->
+        <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="font-black text-slate-700">📋 獎品管理</h2>
+                <button id="addNewPrizeBtn" class="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">＋ 新增獎品</button>
+            </div>
+            <div id="prizeList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        </section>
+
+        <!-- 🪙 點數錢包管理 -->
+        <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="font-black text-slate-700">🪙 玩家點數錢包</h2>
+                <button id="addWalletBtn" class="bg-cyan-500 hover:bg-cyan-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">＋ 新增錢包</button>
+            </div>
+            <div id="walletList" class="space-y-2"><p class="text-gray-400 text-sm">讀取中...</p></div>
+        </section>
+
+        <!-- 🛍️ 商品管理 -->
+        <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="font-black text-slate-700">🛍️ 商品專區管理</h2>
+                <button id="addShopItemBtn" class="bg-purple-500 hover:bg-purple-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">＋ 新增商品</button>
+            </div>
+            <div id="shopItemList" class="grid grid-cols-1 md:grid-cols-2 gap-4"><p class="text-gray-400 text-sm col-span-2">讀取中...</p></div>
+        </section>
+
+        <!-- 👑 中獎名單 -->
+        <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="font-black text-slate-700">👑 中獎名單（共 <span id="winnerCount">0</span> 筆）</h2>
+                <button id="exportCSVBtn" class="bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">⬇ 匯出 CSV</button>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-400 text-xs border-b">
+                            <th class="py-2 pr-4">姓名</th><th class="py-2 pr-4">群組</th><th class="py-2 pr-4">中獎項目</th><th class="py-2 pr-4">序號 / 連結</th><th class="py-2 pr-4">時間</th><th class="py-2 pr-4">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="winnerTableBody"></tbody>
+                </table>
+                <div id="winnerEmptyState" class="text-center text-gray-400 text-sm py-8">目前還沒有人抽獎</div>
+            </div>
+        </section>
+
+        <!-- ⚠️ 危險區域 -->
+        <section class="bg-rose-50 rounded-3xl border border-rose-200 shadow p-5 md:p-6">
+            <h2 class="font-black text-rose-600 mb-2">⚠️ 危險區域</h2>
+            <p class="text-xs text-rose-500 mb-4">以下操作無法復原，請確認活動真的要「重新開始」再執行（例如測試完畢、正式開賣前）。</p>
+            <button id="resetDrawDataBtn" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">🗑️ 清空所有中獎紀錄與裝置限制（不影響獎品設定）</button>
+        </section>
+    </div>
+
+    <!-- 🔐 新增 / 編輯錢包彈窗 -->
+    <div id="walletModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" style="display: none;">
+        <div class="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl border-4 border-cyan-400">
+            <h2 class="text-xl font-black text-slate-800 mb-4" id="walletModalTitle">新增玩家錢包</h2>
+            <input type="hidden" id="walletEditName">
+            <div class="space-y-3">
+                <div><label class="field-label">玩家姓名</label><input type="text" id="walletPlayerName" class="field-input" placeholder="例如：貝果"></div>
+                <div><label class="field-label">點數</label><input type="number" id="walletPoints" class="field-input" value="0"></div>
+                <div><label class="field-label">點數到期日</label><input type="date" id="walletExpiry" class="field-input"></div>
+                <div><label class="field-label">個人錢包密語（明文，儲存時會自動加密）</label><input type="text" id="walletPass" class="field-input" placeholder="留空則不修改密語"></div>
+                <div><label class="field-label">綁定裝置 UID（通常自動綁定，手動清空可解除綁定）</label><input type="text" id="walletBoundUid" class="field-input" placeholder="留空表示無綁定"></div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button id="cancelWalletBtn" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-2.5 rounded-xl text-sm">取消</button>
+                <button id="saveWalletBtn" class="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2.5 rounded-xl text-sm">儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+        import { getDatabase, ref, onValue, update, remove, set, get, runTransaction, push } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDMG8bM8VO_al-k40JxfRu4bgph78e2PDs",
+            authDomain: "daidaikunbao.firebaseapp.com",
+            databaseURL: "https://daidaikunbao-default-rtdb.firebaseio.com/"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const auth = getAuth(app);
+
+        const CLOUDINARY_CLOUD_NAME = "ypveg7ny";
+        const CLOUDINARY_UPLOAD_PRESET = "DaiDai";
+        const groupOptions = [
+            { key: "皮皮", label: "✨ 皮皮群" },
+            { key: "GM", label: "✨ 龜蜜群" }
+        ];
+
+        let currentPrizes = {};
+        let currentPrizeCodes = {};
+        let currentPlayedUsers = {};
+        let currentPlayedDevices = {};
+        let currentPointUsers = {};
+        let currentShopItems = {};
+        let pendingPoints = {};
+        let redeemRequests = {};
+        let editingPrizeIds = new Set();
+        let dbListenersStarted = false;
+
+        // ---------- 通用輔助 ----------
+        function escapeHtml(str) { return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+        function escapeAttr(str) { return escapeHtml(str).replace(/"/g, "&quot;"); }
+        function csvEscape(value) { const s = String(value ?? ""); if (s.includes(",") || s.includes('"') || s.includes("\n")) return '"' + s.replace(/"/g, '""') + '"'; return s; }
+        async function sha256(message) { const buf = new TextEncoder().encode(message); const hash = await crypto.subtle.digest("SHA-256", buf); return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join(""); }
+
+        // ---------- Cloudinary ----------
+        async function uploadFileToCloudinary(file) {
+            const fd = new FormData(); fd.append("file", file); fd.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+            const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`, { method: "POST", body: fd });
+            const d = await r.json(); if (!r.ok) throw new Error(d.error?.message || "上傳失敗"); return d.secure_url;
+        }
+
+        function triggerImageUpload(id) { document.getElementById(`imageUploadInput-${id}`)?.click(); }
+        function triggerCodesUpload(id) { document.getElementById(`codesUploadInput-${id}`)?.click(); }
+        window.handleImageUpload = async (id, inputEl) => {
+            const file = inputEl.files?.[0]; if (!file) return;
+            editingPrizeIds.add(id);
+            const card = document.querySelector(`.prize-card[data-prize-id="${id}"]`);
+            const imgIn = card?.querySelector('[data-field="image"]'); if (!imgIn) return;
+            const orig = imgIn.value; imgIn.value = "⏳ 上傳中…"; imgIn.disabled = true;
+            try { imgIn.value = await uploadFileToCloudinary(file); } catch (e) { alert("❌ 上傳失敗："+e.message); imgIn.value = orig; }
+            finally { imgIn.disabled = false; inputEl.value = ""; }
+        };
+        window.handleCodesUpload = async (id, inputEl) => {
+            const files = Array.from(inputEl.files||[]); if (!files.length) return;
+            editingPrizeIds.add(id);
+            const card = document.querySelector(`.prize-card[data-prize-id="${id}"]`);
+            const ta = card?.querySelector('[data-field="ticketCodes"]'); if (!ta) return;
+            const prog = document.getElementById(`uploadProgress-${id}`); if (prog) prog.style.display="block";
+            let ok=0;
+            for (let i=0;i<files.length;i++){ if(prog) prog.innerText=`⏳ 上傳中… (${i+1}/${files.length})`; try { const url=await uploadFileToCloudinary(files[i]); ta.value = ta.value ? ta.value+"\n"+url : url; ok++; } catch(e){ alert(`❌ ${files[i].name} 失敗`); } }
+            if(prog) prog.innerText=`✅ 完成 ${ok}/${files.length}，記得儲存`;
+            inputEl.value = "";
+        };
+        window.setQuantityFromLineCount = (id) => {
+            const card=document.querySelector(`.prize-card[data-prize-id="${id}"]`); if(!card) return;
+            const ta=card.querySelector('[data-field="ticketCodes"]'); const qi=card.querySelector('[data-field="quantity"]');
+            const cnt=ta.value.split("\n").map(s=>s.trim()).filter(s=>s.length).length; if(!cnt){alert("無內容");return;}
+            if(!confirm(`將庫存設為 ${cnt}？`))return; qi.value=cnt; editingPrizeIds.add(id);
+        };
+        window.fillCodesFromQuantity = (id) => {
+            const card=document.querySelector(`.prize-card[data-prize-id="${id}"]`); if(!card) return;
+            const ta=card.querySelector('[data-field="ticketCodes"]'); const qi=card.querySelector('[data-field="quantity"]');
+            const n=Number(qi.value||0); if(!n){alert("請填數量");return;}
+            const lines=ta.value.split("\n").map(s=>s.trim()).filter(s=>s.length); if(!lines.length){alert("請先填一行內容");return;}
+            if(lines.length>1&&!confirm(`將用第一行「${lines[0]}」填滿 ${n} 行？`))return;
+            if(lines.length===1&&!confirm(`複製填滿 ${n} 行？`))return;
+            ta.value = new Array(n).fill(lines[0]).join("\n"); editingPrizeIds.add(id);
+        };
+
+        // ---------- 登入/登出 ----------
+        function tryAdminLogin() {
+            const email = document.getElementById("adminEmailInput").value.trim();
+            const pass = document.getElementById("adminPassInput").value;
+            const errEl = document.getElementById("loginError");
+            errEl.innerText = "";
+            signInWithEmailAndPassword(auth, email, pass).catch(e => { errEl.innerText = "❌ 登入失敗：帳號或密碼錯誤"; console.error(e); });
+        }
+        function adminLogout() { signOut(auth); }
+
+        function getYearEndTimestamp() {
+            const now = new Date();
+            return new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999).getTime();
+        }
+
+        function startListening() {
+            const connectedRef = ref(db, ".info/connected");
+            onValue(connectedRef, (snap) => {
+                document.getElementById("connStatus").innerText = snap.val() ? "已連線" : "連線中斷";
+                document.getElementById("connStatus").className = snap.val() ? "font-bold text-emerald-500" : "font-bold text-rose-500";
+            });
+
+            let isClosed = false;
+            onValue(ref(db, "settings/closed"), (snap) => {
+                isClosed = snap.val() === true;
+                const btn = document.getElementById("closedToggleBtn");
+                btn.innerText = isClosed ? "🔒 打烊模式：開啟中（點擊恢復營業）" : "🔓 打烊模式：關閉（點擊開啟打烊）";
+                btn.className = isClosed ? "text-xs font-bold px-4 py-2 rounded-xl transition-all bg-rose-500 hover:bg-rose-600 text-white" : "text-xs font-bold px-4 py-2 rounded-xl transition-all bg-gray-200 hover:bg-gray-300 text-gray-500";
+            });
+            document.getElementById("closedToggleBtn").addEventListener("click", () => {
+                const next = !isClosed;
+                if (!confirm(next ? "開啟打烊模式？" : "關閉打烊模式，恢復營業？")) return;
+                set(ref(db, "settings/closed"), next).catch(err => alert("❌ 設定失敗：" + err.message));
+            });
+
+            onValue(ref(db, "prizes"), (snapshot) => { currentPrizes = snapshot.val() || {}; renderPrizeList(); }, (err) => { console.error(err); });
+            onValue(ref(db, "prizeCodes"), (snapshot) => { currentPrizeCodes = snapshot.val() || {}; renderPrizeList(); });
+            onValue(ref(db, "playedUsers"), (snapshot) => { currentPlayedUsers = snapshot.val() || {}; renderWinnerTable(); });
+            onValue(ref(db, "playedDevices"), (snapshot) => { currentPlayedDevices = snapshot.val() || {}; });
+            onValue(ref(db, "pointUsers"), (snapshot) => { currentPointUsers = snapshot.val() || {}; renderWalletList(); });
+            onValue(ref(db, "shopItems"), (snapshot) => { currentShopItems = snapshot.val() || {}; renderShopItemList(); });
+            onValue(ref(db, "pendingPoints"), (snapshot) => { pendingPoints = snapshot.val() || {}; renderPendingPoints(); });
+            onValue(ref(db, "redeemRequests"), (snapshot) => { redeemRequests = snapshot.val() || {}; renderRedeemRequests(); });
+        }
+
+        // ---------- 點數記錄 ----------
+        function renderPendingPoints() {
+            const c = document.getElementById("pendingPointsList");
+            const allIds = Object.keys(pendingPoints);
+            if (!allIds.length) { c.innerHTML = '<p class="text-gray-400 text-sm">尚無點數記錄</p>'; return; }
+            const sorted = allIds.sort((a, b) => (pendingPoints[b].timestamp || 0) - (pendingPoints[a].timestamp || 0));
+            c.innerHTML = sorted.map(id => {
+                const p = pendingPoints[id];
+                const time = p.timestamp ? new Date(p.timestamp).toLocaleString("zh-TW") : "未知時間";
+                const statusText = p.status === "approved" ? "✅ 已發放" : p.status === "rejected" ? "🗑️ 已拒絕" : "🕒 待處理";
+                // 點數可能為負值（扣點），顯示正負號
+                const pointStr = p.points >= 0 ? `+${p.points}` : `${p.points}`;
+                return `<div class="pending-item">
+                    <div>
+                        <span class="font-bold">${escapeHtml(p.playerName)}</span> 🪙 ${pointStr}（${escapeHtml(p.prizeName || '')}）
+                        <div class="text-xs text-gray-500">${time}</div>
+                        <span class="text-xs ${p.status==='approved'?'text-emerald-500':p.status==='rejected'?'text-rose-400':'text-amber-500'}">${statusText}</span>
+                    </div>
+                    <div class="flex gap-2">
+                        ${p.status === "pending" ? `<button class="approve-pts bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-lg" data-id="${id}">✅ 發放</button><button class="reject-pts bg-rose-400 text-white text-xs font-bold px-3 py-1 rounded-lg" data-id="${id}">🗑️ 拒絕</button>` : ''}
+                        <button class="delete-point-record bg-gray-400 hover:bg-gray-500 text-white text-xs font-bold px-3 py-1 rounded-lg" data-id="${id}">🗑️ 刪除記錄</button>
+                    </div>
+                </div>`;
+            }).join("");
+            c.querySelectorAll(".approve-pts").forEach(b => b.addEventListener("click", e => approvePoints(e.target.dataset.id)));
+            c.querySelectorAll(".reject-pts").forEach(b => b.addEventListener("click", e => rejectPoints(e.target.dataset.id)));
+            c.querySelectorAll(".delete-point-record").forEach(b => b.addEventListener("click", e => deletePointRecord(e.target.dataset.id)));
+        }
+
+        async function approvePoints(id) {
+            const p = pendingPoints[id]; if (!p) return;
+            if (!confirm(`發放 ${p.points} 點給 ${p.playerName}？`)) return;
+            const yearEnd = getYearEndTimestamp();
+            const wRef = ref(db, `pointUsers/${p.playerName}`);
+            await runTransaction(wRef, (cur) => {
+                if (!cur) {
+                    return { points: p.points, expiry: yearEnd, personalPassHash: "", boundUid: "", transactions: { [Date.now()]: { amount: p.points, timestamp: Date.now(), type: "earn" } } };
+                }
+                cur.points = (cur.points || 0) + p.points;
+                cur.expiry = yearEnd;
+                if (!cur.transactions) cur.transactions = {};
+                cur.transactions[Date.now()] = { amount: p.points, timestamp: Date.now(), type: "earn" };
+                return cur;
+            });
+            await update(ref(db, `pendingPoints/${id}`), { status: "approved", processedAt: Date.now() });
+            alert("✅ 已發放");
+        }
+
+        async function rejectPoints(id) {
+            if (!confirm("拒絕這筆點數？")) return;
+            await update(ref(db, `pendingPoints/${id}`), { status: "rejected", processedAt: Date.now() }); alert("已拒絕");
+        }
+
+        async function deletePointRecord(id) {
+            if (!confirm("確定要刪除這筆點數記錄嗎？此操作無法復原。")) return;
+            try { await remove(ref(db, `pendingPoints/${id}`)); alert("✅ 點數記錄已刪除"); } catch(e) { alert("❌ 刪除失敗：" + e.message); }
+        }
+
+        // ---------- 兌換記錄 ----------
+        function renderRedeemRequests() {
+            const c = document.getElementById("redeemRequestsList");
+            const allIds = Object.keys(redeemRequests);
+            if (!allIds.length) { c.innerHTML = '<p class="text-gray-400 text-sm">尚無兌換記錄</p>'; return; }
+            const sorted = allIds.sort((a, b) => (redeemRequests[b].timestamp || 0) - (redeemRequests[a].timestamp || 0));
+            c.innerHTML = sorted.map(id => {
+                const r = redeemRequests[id];
+                const time = r.timestamp ? new Date(r.timestamp).toLocaleString("zh-TW") : "未知時間";
+                const delivered = r.prizeDelivered === true;
+                const statusText = r.status === "approved" ? "✅ 已兌換" : r.status === "rejected" ? "🗑️ 已拒絕" : "🕒 待處理";
+                return `<div class="pending-item">
+                    <div>
+                        <span class="font-bold">${escapeHtml(r.playerName)}</span> 兌換「${escapeHtml(r.itemName)}」（🪙 ${r.cost}）
+                        <div class="text-xs text-gray-500">${time}</div>
+                        <span class="text-xs ${r.status==='approved'?'text-emerald-500':r.status==='rejected'?'text-rose-400':'text-amber-500'}">${statusText}</span>
+                        <label class="inline-flex items-center gap-1 ml-3 text-xs font-bold text-gray-600 cursor-pointer">
+                            <input type="checkbox" class="prize-delivered-check" data-id="${id}" ${delivered ? 'checked' : ''}> 獎品已發放
+                        </label>
+                    </div>
+                    <div class="flex gap-2">
+                        ${r.status === "pending" ? `<button class="approve-redeem bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-lg" data-id="${id}">✅ 確認兌換</button><button class="reject-redeem bg-rose-400 text-white text-xs font-bold px-3 py-1 rounded-lg" data-id="${id}">🗑️ 拒絕</button>` : ''}
+                        <button class="delete-redeem-record bg-gray-400 hover:bg-gray-500 text-white text-xs font-bold px-3 py-1 rounded-lg" data-id="${id}">🗑️ 刪除記錄</button>
+                    </div>
+                </div>`;
+            }).join("");
+            c.querySelectorAll(".prize-delivered-check").forEach(cb => {
+                cb.addEventListener("change", async (e) => {
+                    const id = e.target.dataset.id;
+                    const checked = e.target.checked;
+                    try { await update(ref(db, `redeemRequests/${id}`), { prizeDelivered: checked }); } catch(err) { alert("更新失敗：" + err.message); e.target.checked = !checked; }
+                });
+            });
+            c.querySelectorAll(".approve-redeem").forEach(b => b.addEventListener("click", e => approveRedeem(e.target.dataset.id)));
+            c.querySelectorAll(".reject-redeem").forEach(b => b.addEventListener("click", e => rejectRedeem(e.target.dataset.id)));
+            c.querySelectorAll(".delete-redeem-record").forEach(b => b.addEventListener("click", e => deleteRedeemRecord(e.target.dataset.id)));
+        }
+
+        async function approveRedeem(id) {
+            const r = redeemRequests[id]; if (!r) return;
+            const wSnap = await get(ref(db, `pointUsers/${r.playerName}`)); const w = wSnap.val();
+            if (!w || (w.points||0) < r.cost) { alert("❌ 點數不足"); return; }
+            const iSnap = await get(ref(db, `shopItems/${r.itemId}`)); const item = iSnap.val();
+            if (!item || item.stock<=0) { alert("❌ 庫存不足"); return; }
+            await runTransaction(ref(db, `pointUsers/${r.playerName}`), cur => {
+                if (!cur || (cur.points||0) < r.cost) return;
+                cur.points -= r.cost;
+                if (!cur.transactions) cur.transactions = {};
+                cur.transactions[Date.now()] = { amount: -r.cost, timestamp:Date.now(), type:"redeem" };
+                return cur;
+            });
+            await runTransaction(ref(db, `shopItems/${r.itemId}/stock`), cur => (cur===null||cur<=0) ? undefined : cur-1);
+            await update(ref(db, `redeemRequests/${id}`), { status:"approved", processedAt:Date.now() }); alert("✅ 兌換成功");
+        }
+
+        async function rejectRedeem(id) {
+            if (!confirm("拒絕兌換？")) return;
+            await update(ref(db, `redeemRequests/${id}`), { status:"rejected", processedAt:Date.now() }); alert("已拒絕");
+        }
+
+        async function deleteRedeemRecord(id) {
+            if (!confirm("確定要刪除這筆兌換記錄嗎？此操作無法復原。")) return;
+            try { await remove(ref(db, `redeemRequests/${id}`)); alert("✅ 兌換記錄已刪除"); } catch(e) { alert("❌ 刪除失敗：" + e.message); }
+        }
+
+        // ---------- 獎品管理 ----------
+        function buildPrizeCardHtml(id) {
+            const p = currentPrizes[id]; const codesObj = currentPrizeCodes[id];
+            const ticketCodesText = codesObj ? Object.keys(codesObj).sort((a,b)=>Number(a)-Number(b)).map(k=>codesObj[k]).join("\n") : "";
+            const groups = Array.isArray(p.groups) ? p.groups : [];
+            const groupCB = groupOptions.map(g => `<label style="display:inline-flex;align-items:center;gap:4px;margin-right:12px;font-size:12px;font-weight:bold;color:#475569;"><input type="checkbox" data-group-key="${escapeAttr(g.key)}" ${groups.includes(g.key)?"checked":""}>${g.label}</label>`).join("");
+            return `<div class="prize-card" data-prize-id="${id}">
+                <div class="flex justify-between mb-2"><span class="text-xs font-mono text-gray-400">${id}</span><button class="delete-prize text-rose-400 text-xs font-bold" data-id="${id}">🗑️ 刪除</button></div>
+                <div class="space-y-2">
+                    <div><label class="field-label">獎品名稱</label><input class="field-input" data-field="name" value="${escapeAttr(p.name||'')}"></div>
+                    <div><label class="field-label">圖片網址</label><div class="flex gap-2"><input class="field-input" data-field="image" value="${escapeAttr(p.image||'')}"><button class="upload-img-btn bg-cyan-100 text-cyan-700 text-xs font-bold px-3 rounded-lg" data-id="${id}">📤 上傳</button></div><input type="file" accept="image/*,video/*" style="display:none" id="imageUploadInput-${id}"></div>
+                    <div class="grid grid-cols-3 gap-2"><div><label class="field-label">目前庫存</label><input type="number" class="field-input" data-field="quantity" value="${Number(p.quantity||0)}"></div><div><label class="field-label">原始總數</label><input type="number" class="field-input" data-field="totalQuantity" value="${p.totalQuantity!=null?Number(p.totalQuantity):''}"></div><div><label class="field-label">權重</label><input type="number" class="field-input" data-field="weight" value="${Number(p.weight||0)}"></div></div>
+                    <div class="grid grid-cols-2 gap-2"><div><label class="field-label">最小點數</label><input type="number" class="field-input" data-field="minPoints" value="${p.minPoints!=null?Number(p.minPoints):''}"></div><div><label class="field-label">最大點數</label><input type="number" class="field-input" data-field="maxPoints" value="${p.maxPoints!=null?Number(p.maxPoints):''}"></div></div>
+                    <div><label class="field-label">哪些群看得到／抽得到</label><div class="prize-groups-checkboxes">${groupCB}</div></div>
+                    <div><div class="flex justify-between items-center"><label class="field-label">序號/連結</label><div class="flex gap-1"><button class="set-qty-btn text-xs font-bold px-2 py-1 rounded-lg bg-amber-100 text-amber-700" data-id="${id}">🔢 依行數</button><button class="fill-qty-btn text-xs font-bold px-2 py-1 rounded-lg bg-amber-100 text-amber-700" data-id="${id}">🔁 複製填滿</button><button class="upload-codes-btn text-xs font-bold px-2 py-1 rounded-lg bg-cyan-100 text-cyan-700" data-id="${id}">📤 批次上傳</button></div></div><textarea class="field-input" data-field="ticketCodes" rows="3">${escapeHtml(ticketCodesText)}</textarea><input type="file" accept="image/*,video/*" multiple style="display:none" id="codesUploadInput-${id}"><div id="uploadProgress-${id}" class="text-xs text-cyan-600 mt-1 hidden"></div></div>
+                    <button class="save-prize-btn w-full bg-slate-900 text-white text-xs font-bold py-2 rounded-xl mt-1" data-id="${id}">💾 儲存這個獎品</button>
+                </div></div>`;
+        }
+
+        function renderPrizeList() {
+            const container = document.getElementById("prizeList");
+            const ids = Object.keys(currentPrizes);
+            if (!ids.length) { container.innerHTML = '<p class="text-gray-400 col-span-2 text-center py-6">尚無獎品</p>'; return; }
+            ids.forEach(id => { if (editingPrizeIds.has(id)) return; const html = buildPrizeCardHtml(id); const exist = container.querySelector(`.prize-card[data-prize-id="${id}"]`); if (exist) exist.outerHTML = html; else container.insertAdjacentHTML("beforeend", html); });
+            container.querySelectorAll(".prize-card").forEach(c => { const id=c.dataset.prizeId; if (!currentPrizes[id] && !editingPrizeIds.has(id)) c.remove(); });
+            container.querySelectorAll(".upload-img-btn").forEach(b => b.addEventListener("click", e => triggerImageUpload(e.target.dataset.id)));
+            container.querySelectorAll(".upload-codes-btn").forEach(b => b.addEventListener("click", e => triggerCodesUpload(e.target.dataset.id)));
+            container.querySelectorAll(".save-prize-btn").forEach(b => b.addEventListener("click", e => savePrize(e.target.dataset.id)));
+            container.querySelectorAll(".delete-prize").forEach(b => b.addEventListener("click", e => deletePrize(e.target.dataset.id)));
+            container.querySelectorAll(".set-qty-btn").forEach(b => b.addEventListener("click", e => window.setQuantityFromLineCount(e.target.dataset.id)));
+            container.querySelectorAll(".fill-qty-btn").forEach(b => b.addEventListener("click", e => window.fillCodesFromQuantity(e.target.dataset.id)));
+            container.querySelectorAll("input[type=file]").forEach(inp => {
+                if (inp.id.startsWith("imageUploadInput-")) inp.addEventListener("change", e => window.handleImageUpload(inp.id.split("-")[1], e.target));
+                else if (inp.id.startsWith("codesUploadInput-")) inp.addEventListener("change", e => window.handleCodesUpload(inp.id.split("-")[1], e.target));
+            });
+        }
+
+        async function savePrize(id) {
+            const card = document.querySelector(`.prize-card[data-prize-id="${id}"]`); if (!card) return;
+            const name = card.querySelector('[data-field="name"]').value.trim();
+            const image = card.querySelector('[data-field="image"]').value.trim();
+            const quantity = Number(card.querySelector('[data-field="quantity"]').value||0);
+            const totalQ = card.querySelector('[data-field="totalQuantity"]').value.trim();
+            const weight = Number(card.querySelector('[data-field="weight"]').value||0);
+            const minP = card.querySelector('[data-field="minPoints"]').value.trim();
+            const maxP = card.querySelector('[data-field="maxPoints"]').value.trim();
+            const codesRaw = card.querySelector('[data-field="ticketCodes"]').value;
+            const groups = Array.from(card.querySelectorAll('[data-group-key]:checked')).map(cb=>cb.dataset.groupKey);
+            const codes = codesRaw.split("\n").map(s=>s.trim()).filter(s=>s);
+            const payload = { name, image, quantity, weight, groups };
+            if (totalQ) payload.totalQuantity = Number(totalQ);
+            if (minP) payload.minPoints = Number(minP);
+            if (maxP) payload.maxPoints = Number(maxP);
+            const codesPayload = {}; codes.forEach((c,i) => codesPayload[i]=c);
+            try {
+                await Promise.all([ update(ref(db, "prizes/"+id), payload), set(ref(db, "prizeCodes/"+id), codes.length?codesPayload:null) ]);
+                alert(`✅ 「${name||id}」已儲存`); editingPrizeIds.delete(id); renderPrizeList();
+            } catch(e) { alert("❌ 儲存失敗："+e.message); }
+        }
+
+        function addNewPrize() {
+            const exist = Object.keys(currentPrizes).filter(id=>/^p\d+$/.test(id));
+            const next = exist.length ? Math.max(...exist.map(id=>parseInt(id.slice(1))))+1 : 1;
+            const newId = prompt("獎品代號（例如 p"+next+"）", "p"+next);
+            if (!newId || currentPrizes[newId]) { alert("❌ 代號已存在"); return; }
+            update(ref(db, "prizes/"+newId), { name:"新獎品", image:"", quantity:1, totalQuantity:1, weight:1, groups:[], minPoints:0, maxPoints:0 });
+        }
+
+        function deletePrize(id) {
+            if (!confirm(`刪除「${currentPrizes[id]?.name||id}」？`)) return;
+            Promise.all([remove(ref(db, "prizes/"+id)), remove(ref(db, "prizeCodes/"+id))]).catch(e=>alert("❌ "+e.message));
+        }
+
+        // ---------- 錢包管理 ----------
+        function renderWalletList() {
+            const c = document.getElementById("walletList");
+            const names = Object.keys(currentPointUsers);
+            if (!names.length) { c.innerHTML='<p class="text-gray-400 text-sm">尚無錢包</p>'; return; }
+            c.innerHTML = names.sort((a,b)=>a.localeCompare(b,"zh-TW")).map(name => {
+                const w = currentPointUsers[name]; const exp = w.expiry ? new Date(w.expiry).toLocaleDateString("zh-TW") : "無限期";
+                return `<div class="wallet-card flex justify-between items-center flex-wrap gap-2"><div><span class="font-bold">${escapeHtml(name)}</span> 🪙 ${w.points||0} 📅 ${exp} ${w.boundUid?'🔗已綁定':'🔗未綁定'}</div>
+                <div class="flex gap-2"><button class="edit-wallet bg-cyan-100 text-cyan-700 text-xs px-3 py-1 rounded-lg" data-name="${escapeAttr(name)}">編輯</button>
+                <button class="delete-wallet bg-rose-100 text-rose-600 text-xs px-3 py-1 rounded-lg" data-name="${escapeAttr(name)}">刪除</button></div></div>`;
+            }).join("");
+            c.querySelectorAll(".edit-wallet").forEach(b => b.addEventListener("click", e => editWallet(e.target.dataset.name)));
+            c.querySelectorAll(".delete-wallet").forEach(b => b.addEventListener("click", e => deleteWallet(e.target.dataset.name)));
+        }
+
+        function editWallet(name) {
+            const data = currentPointUsers[name]; if (!data) return;
+            document.getElementById("walletModalTitle").innerText = "編輯玩家錢包";
+            document.getElementById("walletEditName").value = name;
+            document.getElementById("walletPlayerName").value = name; document.getElementById("walletPlayerName").disabled = true;
+            document.getElementById("walletPoints").value = data.points||0;
+            document.getElementById("walletExpiry").value = data.expiry ? new Date(data.expiry).toISOString().slice(0,10) : "";
+            document.getElementById("walletPass").value = "";
+            document.getElementById("walletBoundUid").value = data.boundUid||"";
+            document.getElementById("walletModal").style.display = "flex";
+        }
+
+        function showAddWalletModal() {
+            document.getElementById("walletModalTitle").innerText = "新增玩家錢包";
+            document.getElementById("walletEditName").value = ""; document.getElementById("walletPlayerName").disabled = false;
+            document.getElementById("walletPlayerName").value = ""; document.getElementById("walletPoints").value = 0;
+            const yearEnd = new Date(new Date().getFullYear(), 11, 31);
+            document.getElementById("walletExpiry").value = yearEnd.toISOString().slice(0,10);
+            document.getElementById("walletPass").value = ""; document.getElementById("walletBoundUid").value = "";
+            document.getElementById("walletModal").style.display = "flex";
+        }
+
+        function closeWalletModal() { document.getElementById("walletModal").style.display = "none"; }
+
+        // 🔥 修改後的 saveWallet：自動記錄點數變化
+        async function saveWallet() {
+            const editName = document.getElementById("walletEditName").value.trim();
+            const playerName = document.getElementById("walletPlayerName").value.trim();
+            const newPoints = parseInt(document.getElementById("walletPoints").value) || 0;
+            const expiryStr = document.getElementById("walletExpiry").value;
+            const passRaw = document.getElementById("walletPass").value.trim();
+            const boundUid = document.getElementById("walletBoundUid").value.trim();
+
+            if (!playerName) { alert("請輸入姓名"); return; }
+
+            const expiry = expiryStr ? new Date(expiryStr).getTime() : getYearEndTimestamp();
+
+            const payload = {
+                points: newPoints,
+                expiry: expiry,
+                boundUid: boundUid || "",
+                personalPassHash: passRaw ? await sha256(passRaw) : (editName ? (currentPointUsers[editName]?.personalPassHash || "") : "")
+            };
+
+            // 記錄舊點數 (若為編輯模式)
+            let oldPoints = null;
+            if (editName) {
+                oldPoints = currentPointUsers[editName]?.points || 0;
+            } else if (currentPointUsers[playerName]) {
+                // 新增但已存在？不應該發生，但以防萬一
+                oldPoints = currentPointUsers[playerName]?.points || 0;
+            }
+
+            try {
+                const target = editName || playerName;
+                if (editName && editName !== playerName) {
+                    await remove(ref(db, `pointUsers/${editName}`));
+                    await set(ref(db, `pointUsers/${playerName}`), payload);
+                } else if (!editName) {
+                    await set(ref(db, `pointUsers/${playerName}`), payload);
+                } else {
+                    await update(ref(db, `pointUsers/${target}`), payload);
+                }
+
+                // 計算點數差額並記錄
+                const delta = newPoints - (oldPoints || 0);
+                if (delta !== 0) {
+                    await push(ref(db, "pendingPoints"), {
+                        playerName: playerName,
+                        points: delta,
+                        prizeName: "管理員手動調整",
+                        timestamp: Date.now(),
+                        status: "approved",
+                        processedAt: Date.now()
+                    });
+                }
+
+                alert("✅ 錢包已儲存");
+                closeWalletModal();
+            } catch (e) { alert("❌ " + e.message); }
+        }
+
+        async function deleteWallet(name) {
+            if (!confirm(`刪除「${name}」錢包？`)) return;
+            await remove(ref(db, `pointUsers/${name}`)); alert("✅ 已刪除");
+        }
+
+        // ---------- 商品管理 ----------
+        function buildShopCardHtml(id) {
+            const item = currentShopItems[id];
+            return `<div class="shop-card" data-shop-id="${id}">
+                <div class="flex justify-between mb-2"><span class="text-xs font-mono text-gray-400">${id}</span><button class="delete-shop text-rose-400 text-xs font-bold" data-id="${id}">🗑️ 刪除</button></div>
+                <div class="space-y-2">
+                    <div><label class="field-label">名稱</label><input class="field-input" data-field="name" value="${escapeAttr(item.name||'')}"></div>
+                    <div><label class="field-label">圖片</label><div class="flex gap-2"><input class="field-input" data-field="image" value="${escapeAttr(item.image||'')}"><button class="upload-shop-img bg-cyan-100 text-cyan-700 text-xs px-3 rounded-lg" data-id="${id}">📤 上傳</button></div><input type="file" style="display:none" id="shopImageUploadInput-${id}"></div>
+                    <div class="grid grid-cols-2 gap-2"><div><label class="field-label">所需點數</label><input type="number" class="field-input" data-field="cost" value="${Number(item.cost||0)}"></div><div><label class="field-label">庫存</label><input type="number" class="field-input" data-field="stock" value="${Number(item.stock||0)}"></div></div>
+                    <button class="save-shop-btn w-full bg-purple-600 text-white text-xs font-bold py-2 rounded-xl mt-1" data-id="${id}">💾 儲存商品</button>
+                </div></div>`;
+        }
+
+        function renderShopItemList() {
+            const c = document.getElementById("shopItemList");
+            const ids = Object.keys(currentShopItems);
+            if (!ids.length) { c.innerHTML='<p class="text-gray-400 col-span-2 text-center py-6">尚無商品</p>'; return; }
+            c.innerHTML = ids.map(id=>buildShopCardHtml(id)).join("");
+            c.querySelectorAll(".upload-shop-img").forEach(b => b.addEventListener("click", e => document.getElementById(`shopImageUploadInput-${e.target.dataset.id}`).click()));
+            document.querySelectorAll("[id^='shopImageUploadInput-']").forEach(inp => {
+                if (!inp.dataset.listenerAdded) {
+                    inp.addEventListener("change", e => handleShopImageUpload(inp.id.split("-").slice(-1)[0], e.target));
+                    inp.dataset.listenerAdded = "true";
+                }
+            });
+            c.querySelectorAll(".save-shop-btn").forEach(b => b.addEventListener("click", e => saveShopItem(e.target.dataset.id)));
+            c.querySelectorAll(".delete-shop").forEach(b => b.addEventListener("click", e => deleteShopItem(e.target.dataset.id)));
+        }
+
+        async function handleShopImageUpload(id, inputEl) {
+            const file = inputEl.files?.[0]; if (!file) return;
+            const card = document.querySelector(`.shop-card[data-shop-id="${id}"]`);
+            const imgIn = card?.querySelector('[data-field="image"]'); if (!imgIn) return;
+            const orig = imgIn.value; imgIn.value="⏳ 上傳中…"; imgIn.disabled=true;
+            try { imgIn.value = await uploadFileToCloudinary(file); } catch(e) { alert("❌ "+e.message); imgIn.value=orig; }
+            finally { imgIn.disabled=false; inputEl.value=""; }
+        }
+
+        function addNewShopItem() {
+            const id = prompt("商品代號（例如 item1）："); if (!id || currentShopItems[id]) { alert("❌ 代號已存在"); return; }
+            set(ref(db, `shopItems/${id}`), { name:"新商品", cost:10, stock:5, image:"" });
+        }
+
+        async function saveShopItem(id) {
+            const card = document.querySelector(`.shop-card[data-shop-id="${id}"]`); if (!card) return;
+            const name = card.querySelector('[data-field="name"]').value.trim();
+            const image = card.querySelector('[data-field="image"]').value.trim();
+            const cost = parseInt(card.querySelector('[data-field="cost"]').value)||0;
+            const stock = parseInt(card.querySelector('[data-field="stock"]').value)||0;
+            await update(ref(db, `shopItems/${id}`), { name, image, cost, stock }); alert("✅ 已儲存");
+        }
+
+        async function deleteShopItem(id) {
+            if (!confirm(`刪除商品「${currentShopItems[id]?.name||id}」？`)) return;
+            await remove(ref(db, `shopItems/${id}`)); alert("✅ 已刪除");
+        }
+
+        // ---------- 中獎名單 ----------
+        function renderWinnerTable() {
+            const tbody = document.getElementById("winnerTableBody"), empty = document.getElementById("winnerEmptyState");
+            const users = Object.keys(currentPlayedUsers);
+            document.getElementById("winnerCount").innerText = users.length;
+            if (!users.length) { tbody.innerHTML=""; empty.classList.remove("hidden"); return; }
+            empty.classList.add("hidden");
+            const rows = users.map(u=>({ user:u, ...currentPlayedUsers[u] })).sort((a,b)=>(b.time||0)-(a.time||0));
+            tbody.innerHTML = rows.map(r=>`<tr class="border-b"><td class="py-2 font-bold">${escapeHtml(r.user)}</td><td>${escapeHtml(r.group||"-")}</td><td class="text-pink-600 font-bold">${escapeHtml(r.won||"-")}</td><td class="break-all">${escapeHtml(r.code||"-")}</td><td class="text-xs">${r.time?new Date(r.time).toLocaleString("zh-TW"):"-"}</td><td><button class="delete-winner text-rose-400 text-xs font-bold" data-name="${escapeAttr(r.user)}">🗑️ 刪除</button></td></tr>`).join("");
+            tbody.querySelectorAll(".delete-winner").forEach(b => b.addEventListener("click", e => deleteWinnerRecord(e.target.dataset.name)));
+        }
+
+        async function deleteWinnerRecord(name) {
+            if (!confirm(`刪除「${name}」中獎紀錄？`)) return;
+            const updates = {}; updates["playedUsers/"+name] = null;
+            for (const devId in currentPlayedDevices) { if (currentPlayedDevices[devId]?.user===name) updates["playedDevices/"+devId] = null; }
+            await update(ref(db), updates); alert("✅ 已刪除");
+        }
+
+        function exportWinnersCSV() {
+            const users = Object.keys(currentPlayedUsers);
+            if (!users.length) { alert("無資料"); return; }
+            const rows = users.map(u=>({ user:u, ...currentPlayedUsers[u] })).sort((a,b)=>(b.time||0)-(a.time||0));
+            const lines = [["姓名","群組","中獎項目","序號/連結","時間"].join(",")];
+            rows.forEach(r => { const t = r.time?new Date(r.time).toLocaleString("zh-TW"):""; lines.push([r.user, r.group||"", r.won||"", r.code||"", t].map(csvEscape).join(",")); });
+            const blob = new Blob(["\uFEFF"+lines.join("\n")], {type:"text/csv"});
+            const a = document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`中獎名單_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+        }
+
+        async function resetDrawData() {
+            if (prompt("輸入 RESET 確認")!=="RESET") return;
+            await Promise.all([remove(ref(db,"playedUsers")), remove(ref(db,"playedDevices"))]); alert("✅ 已清空");
+        }
+
+        // ---------- 初始事件綁定 ----------
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById("loginBtn").addEventListener("click", tryAdminLogin);
+            document.getElementById("logoutBtn").addEventListener("click", adminLogout);
+            document.getElementById("addNewPrizeBtn").addEventListener("click", addNewPrize);
+            document.getElementById("addWalletBtn").addEventListener("click", showAddWalletModal);
+            document.getElementById("cancelWalletBtn").addEventListener("click", closeWalletModal);
+            document.getElementById("saveWalletBtn").addEventListener("click", saveWallet);
+            document.getElementById("addShopItemBtn").addEventListener("click", addNewShopItem);
+            document.getElementById("exportCSVBtn").addEventListener("click", exportWinnersCSV);
+            document.getElementById("resetDrawDataBtn").addEventListener("click", resetDrawData);
+        });
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                document.getElementById("loginScreen").classList.add("hidden");
+                document.getElementById("adminScreen").classList.remove("hidden");
+                if (!dbListenersStarted) { dbListenersStarted = true; startListening(); }
+            } else {
+                document.getElementById("adminScreen").classList.add("hidden");
+                document.getElementById("loginScreen").classList.remove("hidden");
+            }
+        });
+    </script>
+</body>
+</html>
