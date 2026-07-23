@@ -268,7 +268,6 @@
                 const p = pendingPoints[id];
                 const time = p.timestamp ? new Date(p.timestamp).toLocaleString("zh-TW") : "未知時間";
                 const statusText = p.status === "approved" ? "✅ 已發放" : p.status === "rejected" ? "🗑️ 已拒絕" : "🕒 待處理";
-                // 點數可能為負值（扣點），顯示正負號
                 const pointStr = p.points >= 0 ? `+${p.points}` : `${p.points}`;
                 return `<div class="pending-item">
                     <div>
@@ -418,6 +417,7 @@
             });
         }
 
+        // 🔥 修正後的 savePrize：強制處理 minPoints / maxPoints
         async function savePrize(id) {
             const card = document.querySelector(`.prize-card[data-prize-id="${id}"]`); if (!card) return;
             const name = card.querySelector('[data-field="name"]').value.trim();
@@ -430,10 +430,14 @@
             const codesRaw = card.querySelector('[data-field="ticketCodes"]').value;
             const groups = Array.from(card.querySelectorAll('[data-group-key]:checked')).map(cb=>cb.dataset.groupKey);
             const codes = codesRaw.split("\n").map(s=>s.trim()).filter(s=>s);
-            const payload = { name, image, quantity, weight, groups };
+
+            const payload = {
+                name, image, quantity, weight, groups,
+                // 無論如何都覆蓋點數設定，空值就設為 null（刪除點數效果）
+                minPoints: minP ? Number(minP) : null,
+                maxPoints: maxP ? Number(maxP) : null
+            };
             if (totalQ) payload.totalQuantity = Number(totalQ);
-            if (minP) payload.minPoints = Number(minP);
-            if (maxP) payload.maxPoints = Number(maxP);
             const codesPayload = {}; codes.forEach((c,i) => codesPayload[i]=c);
             try {
                 await Promise.all([ update(ref(db, "prizes/"+id), payload), set(ref(db, "prizeCodes/"+id), codes.length?codesPayload:null) ]);
@@ -446,7 +450,7 @@
             const next = exist.length ? Math.max(...exist.map(id=>parseInt(id.slice(1))))+1 : 1;
             const newId = prompt("獎品代號（例如 p"+next+"）", "p"+next);
             if (!newId || currentPrizes[newId]) { alert("❌ 代號已存在"); return; }
-            update(ref(db, "prizes/"+newId), { name:"新獎品", image:"", quantity:1, totalQuantity:1, weight:1, groups:[], minPoints:0, maxPoints:0 });
+            update(ref(db, "prizes/"+newId), { name:"新獎品", image:"", quantity:1, totalQuantity:1, weight:1, groups:[], minPoints:null, maxPoints:null });
         }
 
         function deletePrize(id) {
@@ -493,7 +497,6 @@
 
         function closeWalletModal() { document.getElementById("walletModal").style.display = "none"; }
 
-        // 🔥 修改後的 saveWallet：自動記錄點數變化
         async function saveWallet() {
             const editName = document.getElementById("walletEditName").value.trim();
             const playerName = document.getElementById("walletPlayerName").value.trim();
@@ -513,12 +516,10 @@
                 personalPassHash: passRaw ? await sha256(passRaw) : (editName ? (currentPointUsers[editName]?.personalPassHash || "") : "")
             };
 
-            // 記錄舊點數 (若為編輯模式)
             let oldPoints = null;
             if (editName) {
                 oldPoints = currentPointUsers[editName]?.points || 0;
             } else if (currentPointUsers[playerName]) {
-                // 新增但已存在？不應該發生，但以防萬一
                 oldPoints = currentPointUsers[playerName]?.points || 0;
             }
 
@@ -533,7 +534,6 @@
                     await update(ref(db, `pointUsers/${target}`), payload);
                 }
 
-                // 計算點數差額並記錄
                 const delta = newPoints - (oldPoints || 0);
                 if (delta !== 0) {
                     await push(ref(db, "pendingPoints"), {
@@ -671,5 +671,3 @@
             }
         });
     </script>
-</body>
-</html>
