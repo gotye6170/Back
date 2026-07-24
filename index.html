@@ -140,7 +140,10 @@
             databaseURL: "https://daidaikunbao-default-rtdb.firebaseio.com/"
         };
 
-        const app = initializeApp(firebaseConfig);
+        // 這裡特意給後台一個獨立的 App 名稱（"adminApp"），
+        // 讓瀏覽器儲存登入狀態時跟主網站（預設 App 名稱）分開存放，
+        // 避免同網域下主網站的匿名登入把後台的管理員登入狀態蓋掉。
+        const app = initializeApp(firebaseConfig, "adminApp");
         const db = getDatabase(app);
         const auth = getAuth(app);
 
