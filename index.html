@@ -17,6 +17,7 @@
         .shop-card { background: white; border-radius: 20px; border: 1px solid #e5e7eb; box-shadow: 0 4px 12px rgba(0,0,0,0.04); padding: 16px; }
         .wallet-card { background: white; border-radius: 16px; border: 1px solid #f1f5f9; padding: 12px; margin-bottom: 8px; }
         .pending-item { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 10px 14px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .player-perm-item { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 8px 14px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
     </style>
 </head>
 <body class="min-h-screen p-4 md:p-8">
@@ -83,6 +84,13 @@
             <div id="shopItemList" class="grid grid-cols-1 md:grid-cols-2 gap-4"><p class="text-gray-400 text-sm col-span-2">讀取中...</p></div>
         </section>
 
+        <!-- 👥 玩家抽獎權限（新增） -->
+        <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
+            <h2 class="font-black text-slate-700 mb-4">👥 玩家抽獎權限</h2>
+            <p class="text-xs text-gray-500 mb-3">開關每個玩家的抽獎資格（關閉後玩家將無法選擇該名字）</p>
+            <div id="playerPermList"><p class="text-gray-400 text-sm">讀取中...</p></div>
+        </section>
+
         <!-- 👑 中獎名單 -->
         <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
             <div class="flex items-center justify-between mb-4">
@@ -140,10 +148,7 @@
             databaseURL: "https://daidaikunbao-default-rtdb.firebaseio.com/"
         };
 
-        // 這裡特意給後台一個獨立的 App 名稱（"adminApp"），
-        // 讓瀏覽器儲存登入狀態時跟主網站（預設 App 名稱）分開存放，
-        // 避免同網域下主網站的匿名登入把後台的管理員登入狀態蓋掉。
-        const app = initializeApp(firebaseConfig, "adminApp");
+        const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         const auth = getAuth(app);
 
@@ -153,6 +158,8 @@
             { key: "皮皮", label: "✨ 皮皮群" },
             { key: "GM", label: "✨ 龜蜜群" }
         ];
+        // 所有玩家清單（與主程式同步）
+        const allPlayerNames = ["貝果", "怡蒨", "７７", "安鴻", "當家", "立涵", "皮夾", "睏寶", "伶", "昀", "瑜"];
 
         let currentPrizes = {};
         let currentPrizeCodes = {};
@@ -162,6 +169,7 @@
         let currentShopItems = {};
         let pendingPoints = {};
         let redeemRequests = {};
+        let disabledPlayers = {};
         let editingPrizeIds = new Set();
         let dbListenersStarted = false;
 
@@ -259,6 +267,7 @@
             onValue(ref(db, "shopItems"), (snapshot) => { currentShopItems = snapshot.val() || {}; renderShopItemList(); });
             onValue(ref(db, "pendingPoints"), (snapshot) => { pendingPoints = snapshot.val() || {}; renderPendingPoints(); });
             onValue(ref(db, "redeemRequests"), (snapshot) => { redeemRequests = snapshot.val() || {}; renderRedeemRequests(); });
+            onValue(ref(db, "disabledPlayers"), (snapshot) => { disabledPlayers = snapshot.val() || {}; renderPlayerPermList(); });
         }
 
         // ---------- 點數記錄 ----------
@@ -420,7 +429,6 @@
             });
         }
 
-        // 🔥 修正後的 savePrize：強制處理 minPoints / maxPoints
         async function savePrize(id) {
             const card = document.querySelector(`.prize-card[data-prize-id="${id}"]`); if (!card) return;
             const name = card.querySelector('[data-field="name"]').value.trim();
@@ -433,13 +441,7 @@
             const codesRaw = card.querySelector('[data-field="ticketCodes"]').value;
             const groups = Array.from(card.querySelectorAll('[data-group-key]:checked')).map(cb=>cb.dataset.groupKey);
             const codes = codesRaw.split("\n").map(s=>s.trim()).filter(s=>s);
-
-            const payload = {
-                name, image, quantity, weight, groups,
-                // 無論如何都覆蓋點數設定，空值就設為 null（刪除點數效果）
-                minPoints: minP ? Number(minP) : null,
-                maxPoints: maxP ? Number(maxP) : null
-            };
+            const payload = { name, image, quantity, weight, groups, minPoints: minP ? Number(minP) : null, maxPoints: maxP ? Number(maxP) : null };
             if (totalQ) payload.totalQuantity = Number(totalQ);
             const codesPayload = {}; codes.forEach((c,i) => codesPayload[i]=c);
             try {
@@ -509,7 +511,6 @@
             const boundUid = document.getElementById("walletBoundUid").value.trim();
 
             if (!playerName) { alert("請輸入姓名"); return; }
-
             const expiry = expiryStr ? new Date(expiryStr).getTime() : getYearEndTimestamp();
 
             const payload = {
@@ -520,11 +521,8 @@
             };
 
             let oldPoints = null;
-            if (editName) {
-                oldPoints = currentPointUsers[editName]?.points || 0;
-            } else if (currentPointUsers[playerName]) {
-                oldPoints = currentPointUsers[playerName]?.points || 0;
-            }
+            if (editName) oldPoints = currentPointUsers[editName]?.points || 0;
+            else if (currentPointUsers[playerName]) oldPoints = currentPointUsers[playerName]?.points || 0;
 
             try {
                 const target = editName || playerName;
@@ -548,7 +546,6 @@
                         processedAt: Date.now()
                     });
                 }
-
                 alert("✅ 錢包已儲存");
                 closeWalletModal();
             } catch (e) { alert("❌ " + e.message); }
@@ -616,6 +613,38 @@
             await remove(ref(db, `shopItems/${id}`)); alert("✅ 已刪除");
         }
 
+        // ---------- 玩家抽獎權限管理（新增）----------
+        function renderPlayerPermList() {
+            const container = document.getElementById("playerPermList");
+            container.innerHTML = allPlayerNames.map(name => {
+                const isDisabled = disabledPlayers[name] === true;
+                return `<div class="player-perm-item">
+                    <span class="font-bold text-sm">${escapeHtml(name)}</span>
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <span class="text-xs text-gray-500">${isDisabled ? '禁用' : '啟用'}</span>
+                        <input type="checkbox" class="player-perm-toggle" data-name="${escapeAttr(name)}" ${isDisabled ? 'checked' : ''}>
+                    </label>
+                </div>`;
+            }).join("");
+
+            container.querySelectorAll(".player-perm-toggle").forEach(cb => {
+                cb.addEventListener("change", async (e) => {
+                    const name = e.target.dataset.name;
+                    const checked = e.target.checked; // true 表示禁用
+                    try {
+                        if (checked) {
+                            await set(ref(db, `disabledPlayers/${name}`), true);
+                        } else {
+                            await remove(ref(db, `disabledPlayers/${name}`));
+                        }
+                    } catch(err) {
+                        alert("更新失敗：" + err.message);
+                        e.target.checked = !checked; // 復原
+                    }
+                });
+            });
+        }
+
         // ---------- 中獎名單 ----------
         function renderWinnerTable() {
             const tbody = document.getElementById("winnerTableBody"), empty = document.getElementById("winnerEmptyState");
@@ -674,3 +703,6 @@
             }
         });
     </script>
+</body>
+</html>
+
