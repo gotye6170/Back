@@ -225,13 +225,26 @@
         };
 
         // ---------- 登入/登出 ----------
-        function tryAdminLogin() {
-            const email = document.getElementById("adminEmailInput").value.trim();
-            const pass = document.getElementById("adminPassInput").value;
-            const errEl = document.getElementById("loginError");
-            errEl.innerText = "";
-            signInWithEmailAndPassword(auth, email, pass).catch(e => { errEl.innerText = "❌ 登入失敗：帳號或密碼錯誤"; console.error(e); });
-        }
+function tryAdminLogin() {
+    const email = document.getElementById("adminEmailInput").value.trim();
+    const pass = document.getElementById("adminPassInput").value;
+    const errEl = document.getElementById("loginError");
+    errEl.innerText = "";
+    // 先強制登出目前任何帳號（包含匿名），再執行管理員登入
+    signOut(auth).then(() => {
+        signInWithEmailAndPassword(auth, email, pass).catch(e => {
+            errEl.innerText = "❌ 登入失敗：帳號或密碼錯誤";
+            console.error(e);
+        });
+    }).catch(() => {
+        // 如果本來就沒登入，signOut 可能會報錯，但我們仍然嘗試登入
+        signInWithEmailAndPassword(auth, email, pass).catch(e => {
+            errEl.innerText = "❌ 登入失敗：帳號或密碼錯誤";
+            console.error(e);
+        });
+    });
+}
+
         function adminLogout() { signOut(auth); }
 
         function getYearEndTimestamp() {
@@ -705,4 +718,3 @@
     </script>
 </body>
 </html>
-
