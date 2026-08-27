@@ -18,6 +18,7 @@
         .wallet-card { background: white; border-radius: 16px; border: 1px solid #f1f5f9; padding: 12px; margin-bottom: 8px; }
         .pending-item { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 10px 14px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
         .player-perm-item { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 8px 14px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .setting-card { background: white; border-radius: 16px; border: 1px solid #e5e7eb; padding: 16px; }
     </style>
 </head>
 <body class="min-h-screen p-4 md:p-8">
@@ -44,6 +45,19 @@
                 <button id="logoutBtn" class="text-xs font-bold text-gray-400 hover:text-rose-500 transition-all">登出</button>
             </div>
         </div>
+
+        <!-- ⚙️ 抽獎設定（新增） -->
+        <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
+            <h2 class="font-black text-slate-700 mb-4">⚙️ 抽獎設定</h2>
+            <div class="setting-card flex items-center gap-4">
+                <div class="flex-grow">
+                    <label class="field-label">每位玩家可抽次數</label>
+                    <input type="number" id="maxDrawsInput" class="field-input" min="1" value="1">
+                </div>
+                <button id="saveMaxDrawsBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2 rounded-xl transition-all">💾 儲存</button>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">設定後，每位玩家在活動期間可抽獎的最大次數。例如設為 2，每位玩家可以抽 2 次。</p>
+        </section>
 
         <!-- 📊 點數記錄 -->
         <section class="bg-amber-50/70 rounded-3xl border border-amber-200 shadow p-5 md:p-6">
@@ -84,14 +98,14 @@
             <div id="shopItemList" class="grid grid-cols-1 md:grid-cols-2 gap-4"><p class="text-gray-400 text-sm col-span-2">讀取中...</p></div>
         </section>
 
-        <!-- 👥 玩家抽獎權限（新增） -->
+        <!-- 👥 玩家抽獎權限 -->
         <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
             <h2 class="font-black text-slate-700 mb-4">👥 玩家抽獎權限</h2>
             <p class="text-xs text-gray-500 mb-3">開關每個玩家的抽獎資格（關閉後玩家將無法選擇該名字）</p>
             <div id="playerPermList"><p class="text-gray-400 text-sm">讀取中...</p></div>
         </section>
 
-        <!-- 👑 中獎名單 -->
+        <!-- 👑 中獎名單（含抽獎次數） -->
         <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="font-black text-slate-700">👑 中獎名單（共 <span id="winnerCount">0</span> 筆）</h2>
@@ -101,7 +115,13 @@
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="text-left text-gray-400 text-xs border-b">
-                            <th class="py-2 pr-4">姓名</th><th class="py-2 pr-4">群組</th><th class="py-2 pr-4">中獎項目</th><th class="py-2 pr-4">序號 / 連結</th><th class="py-2 pr-4">時間</th><th class="py-2 pr-4">操作</th>
+                            <th class="py-2 pr-4">姓名</th>
+                            <th class="py-2 pr-4">群組</th>
+                            <th class="py-2 pr-4">抽獎次數</th>
+                            <th class="py-2 pr-4">最新中獎項目</th>
+                            <th class="py-2 pr-4">序號 / 連結</th>
+                            <th class="py-2 pr-4">時間</th>
+                            <th class="py-2 pr-4">操作</th>
                         </tr>
                     </thead>
                     <tbody id="winnerTableBody"></tbody>
@@ -114,7 +134,7 @@
         <section class="bg-rose-50 rounded-3xl border border-rose-200 shadow p-5 md:p-6">
             <h2 class="font-black text-rose-600 mb-2">⚠️ 危險區域</h2>
             <p class="text-xs text-rose-500 mb-4">以下操作無法復原，請確認活動真的要「重新開始」再執行（例如測試完畢、正式開賣前）。</p>
-            <button id="resetDrawDataBtn" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">🗑️ 清空所有中獎紀錄與裝置限制（不影響獎品設定）</button>
+            <button id="resetDrawDataBtn" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">🗑️ 清空所有中獎紀錄（不影響獎品設定）</button>
         </section>
     </div>
 
@@ -164,7 +184,6 @@
         let currentPrizes = {};
         let currentPrizeCodes = {};
         let currentPlayedUsers = {};
-        let currentPlayedDevices = {};
         let currentPointUsers = {};
         let currentShopItems = {};
         let pendingPoints = {};
@@ -172,6 +191,7 @@
         let disabledPlayers = {};
         let editingPrizeIds = new Set();
         let dbListenersStarted = false;
+        let maxDrawsPerPlayer = 1; // 預設
 
         // ---------- 通用輔助 ----------
         function escapeHtml(str) { return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
@@ -230,18 +250,10 @@
             const pass = document.getElementById("adminPassInput").value;
             const errEl = document.getElementById("loginError");
             errEl.innerText = "";
-            // 先登出当前可能残留的任何用户（包括匿名的），再执行管理员登录
             signOut(auth).then(() => {
-                signInWithEmailAndPassword(auth, email, pass).catch(e => {
-                    errEl.innerText = "❌ 登入失敗：帳號或密碼錯誤";
-                    console.error(e);
-                });
+                signInWithEmailAndPassword(auth, email, pass).catch(e => { errEl.innerText = "❌ 登入失敗：帳號或密碼錯誤"; console.error(e); });
             }).catch(() => {
-                // 如果本来就没登录，直接尝试登录
-                signInWithEmailAndPassword(auth, email, pass).catch(e => {
-                    errEl.innerText = "❌ 登入失敗：帳號或密碼錯誤";
-                    console.error(e);
-                });
+                signInWithEmailAndPassword(auth, email, pass).catch(e => { errEl.innerText = "❌ 登入失敗：帳號或密碼錯誤"; console.error(e); });
             });
         }
         function adminLogout() { signOut(auth); }
@@ -271,16 +283,39 @@
                 set(ref(db, "settings/closed"), next).catch(err => alert("❌ 設定失敗：" + err.message));
             });
 
+            // 讀取抽獎次數設定
+            onValue(ref(db, "settings/global/maxDrawsPerPlayer"), (snap) => {
+                const val = snap.val();
+                if (val && Number.isInteger(val) && val > 0) {
+                    maxDrawsPerPlayer = val;
+                } else {
+                    maxDrawsPerPlayer = 1;
+                }
+                document.getElementById("maxDrawsInput").value = maxDrawsPerPlayer;
+            });
+
             onValue(ref(db, "prizes"), (snapshot) => { currentPrizes = snapshot.val() || {}; renderPrizeList(); }, (err) => { console.error(err); });
             onValue(ref(db, "prizeCodes"), (snapshot) => { currentPrizeCodes = snapshot.val() || {}; renderPrizeList(); });
-            onValue(ref(db, "playedUsers"), (snapshot) => { currentPlayedUsers = snapshot.val() || {}; renderWinnerTable(); });
-            onValue(ref(db, "playedDevices"), (snapshot) => { currentPlayedDevices = snapshot.val() || {}; });
+            onValue(ref(db, "playedUsers"), (snapshot) => {
+                currentPlayedUsers = snapshot.val() || {};
+                renderWinnerTable();
+            });
             onValue(ref(db, "pointUsers"), (snapshot) => { currentPointUsers = snapshot.val() || {}; renderWalletList(); });
             onValue(ref(db, "shopItems"), (snapshot) => { currentShopItems = snapshot.val() || {}; renderShopItemList(); });
             onValue(ref(db, "pendingPoints"), (snapshot) => { pendingPoints = snapshot.val() || {}; renderPendingPoints(); });
             onValue(ref(db, "redeemRequests"), (snapshot) => { redeemRequests = snapshot.val() || {}; renderRedeemRequests(); });
             onValue(ref(db, "disabledPlayers"), (snapshot) => { disabledPlayers = snapshot.val() || {}; renderPlayerPermList(); });
         }
+
+        // ---------- 儲存抽獎次數設定 ----------
+        document.getElementById("saveMaxDrawsBtn").addEventListener("click", async () => {
+            const val = parseInt(document.getElementById("maxDrawsInput").value);
+            if (!val || val < 1) { alert("請輸入大於 0 的整數"); return; }
+            try {
+                await set(ref(db, "settings/global/maxDrawsPerPlayer"), val);
+                alert("✅ 已儲存");
+            } catch(e) { alert("❌ 儲存失敗：" + e.message); }
+        });
 
         // ---------- 點數記錄 ----------
         function renderPendingPoints() {
@@ -657,38 +692,65 @@
             });
         }
 
-        // ---------- 中獎名單 ----------
+        // ---------- 中獎名單（顯示抽獎次數） ----------
         function renderWinnerTable() {
             const tbody = document.getElementById("winnerTableBody"), empty = document.getElementById("winnerEmptyState");
             const users = Object.keys(currentPlayedUsers);
             document.getElementById("winnerCount").innerText = users.length;
             if (!users.length) { tbody.innerHTML=""; empty.classList.remove("hidden"); return; }
             empty.classList.add("hidden");
-            const rows = users.map(u=>({ user:u, ...currentPlayedUsers[u] })).sort((a,b)=>(b.time||0)-(a.time||0));
-            tbody.innerHTML = rows.map(r=>`<tr class="border-b"><td class="py-2 font-bold">${escapeHtml(r.user)}</td><td>${escapeHtml(r.group||"-")}</td><td class="text-pink-600 font-bold">${escapeHtml(r.won||"-")}</td><td class="break-all">${escapeHtml(r.code||"-")}</td><td class="text-xs">${r.time?new Date(r.time).toLocaleString("zh-TW"):"-"}</td><td><button class="delete-winner text-rose-400 text-xs font-bold" data-name="${escapeAttr(r.user)}">🗑️ 刪除</button></td></tr>`).join("");
+            const rows = users.map(u => ({
+                user: u,
+                won: currentPlayedUsers[u].won,
+                code: currentPlayedUsers[u].code,
+                time: currentPlayedUsers[u].time,
+                group: currentPlayedUsers[u].group,
+                drawCount: currentPlayedUsers[u].drawCount || 0
+            })).sort((a,b) => (b.time||0)-(a.time||0));
+            tbody.innerHTML = rows.map(r => {
+                const timeStr = r.time ? new Date(r.time).toLocaleString("zh-TW") : "-";
+                return `<tr class="border-b">
+                    <td class="py-2 font-bold">${escapeHtml(r.user)}</td>
+                    <td>${escapeHtml(r.group||"-")}</td>
+                    <td class="text-center font-bold">${r.drawCount}</td>
+                    <td class="text-pink-600 font-bold">${escapeHtml(r.won||"-")}</td>
+                    <td class="break-all">${escapeHtml(r.code||"-")}</td>
+                    <td class="text-xs">${timeStr}</td>
+                    <td><button class="delete-winner text-rose-400 text-xs font-bold" data-name="${escapeAttr(r.user)}">🗑️ 刪除</button></td>
+                </tr>`;
+            }).join("");
             tbody.querySelectorAll(".delete-winner").forEach(b => b.addEventListener("click", e => deleteWinnerRecord(e.target.dataset.name)));
         }
 
         async function deleteWinnerRecord(name) {
-            if (!confirm(`刪除「${name}」中獎紀錄？`)) return;
-            const updates = {}; updates["playedUsers/"+name] = null;
-            for (const devId in currentPlayedDevices) { if (currentPlayedDevices[devId]?.user===name) updates["playedDevices/"+devId] = null; }
-            await update(ref(db), updates); alert("✅ 已刪除");
+            if (!confirm(`刪除「${name}」的中獎紀錄？`)) return;
+            await remove(ref(db, `playedUsers/${name}`));
+            alert("✅ 已刪除");
         }
 
         function exportWinnersCSV() {
             const users = Object.keys(currentPlayedUsers);
             if (!users.length) { alert("無資料"); return; }
-            const rows = users.map(u=>({ user:u, ...currentPlayedUsers[u] })).sort((a,b)=>(b.time||0)-(a.time||0));
-            const lines = [["姓名","群組","中獎項目","序號/連結","時間"].join(",")];
-            rows.forEach(r => { const t = r.time?new Date(r.time).toLocaleString("zh-TW"):""; lines.push([r.user, r.group||"", r.won||"", r.code||"", t].map(csvEscape).join(",")); });
+            const rows = users.map(u => ({
+                user: u,
+                group: currentPlayedUsers[u].group || "",
+                drawCount: currentPlayedUsers[u].drawCount || 0,
+                won: currentPlayedUsers[u].won || "",
+                code: currentPlayedUsers[u].code || "",
+                time: currentPlayedUsers[u].time ? new Date(currentPlayedUsers[u].time).toLocaleString("zh-TW") : ""
+            }));
+            const lines = [["姓名","群組","抽獎次數","最新中獎項目","序號/連結","時間"].join(",")];
+            rows.forEach(r => {
+                lines.push([r.user, r.group, r.drawCount, r.won, r.code, r.time].map(csvEscape).join(","));
+            });
             const blob = new Blob(["\uFEFF"+lines.join("\n")], {type:"text/csv"});
             const a = document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`中獎名單_${new Date().toISOString().slice(0,10)}.csv`; a.click();
         }
 
         async function resetDrawData() {
             if (prompt("輸入 RESET 確認")!=="RESET") return;
-            await Promise.all([remove(ref(db,"playedUsers")), remove(ref(db,"playedDevices"))]); alert("✅ 已清空");
+            await remove(ref(db,"playedUsers"));
+            alert("✅ 已清空所有抽獎紀錄");
         }
 
         // ---------- 初始事件綁定 ----------
@@ -702,7 +764,18 @@
             document.getElementById("addShopItemBtn").addEventListener("click", addNewShopItem);
             document.getElementById("exportCSVBtn").addEventListener("click", exportWinnersCSV);
             document.getElementById("resetDrawDataBtn").addEventListener("click", resetDrawData);
+            document.getElementById("saveMaxDrawsBtn").addEventListener("click", saveMaxDraws);
         });
+
+        // 儲存抽獎次數設定函式
+        async function saveMaxDraws() {
+            const val = parseInt(document.getElementById("maxDrawsInput").value);
+            if (!val || val < 1) { alert("請輸入大於 0 的整數"); return; }
+            try {
+                await set(ref(db, "settings/global/maxDrawsPerPlayer"), val);
+                alert("✅ 已儲存");
+            } catch(e) { alert("❌ 儲存失敗：" + e.message); }
+        }
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
