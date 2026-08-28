@@ -105,7 +105,7 @@
             <div id="playerPermList"><p class="text-gray-400 text-sm">讀取中...</p></div>
         </section>
 
-        <!-- 👑 中獎名單（含歷史紀錄） -->
+        <!-- 👑 抽獎紀錄（含歷史紀錄） -->
         <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="font-black text-slate-700">👑 抽獎紀錄（共 <span id="winnerCount">0</span> 筆）</h2>
@@ -167,7 +167,7 @@
             databaseURL: "https://daidaikunbao-default-rtdb.firebaseio.com/"
         };
 
-        // 🔥 使用獨立的管理員 Firebase App 實例
+        // 獨立的管理員 Firebase App 實例
         const adminApp = initializeApp(firebaseConfig, "adminApp");
         const db = getDatabase(adminApp);
         const auth = getAuth(adminApp);
@@ -733,12 +733,13 @@
             await remove(ref(db, `shopItems/${id}`)); alert("✅ 已刪除");
         }
 
-        // ---------- 抽獎紀錄（顯示所有歷史） ----------
+        // ---------- 抽獎紀錄（合併顯示所有紀錄） ----------
         function renderWinnerTable() {
             const tbody = document.getElementById("winnerTableBody");
             const empty = document.getElementById("winnerEmptyState");
             const allRows = [];
 
+            // 收集 drawRecords 中的所有紀錄
             for (const name in drawRecords) {
                 const records = drawRecords[name];
                 if (records && typeof records === 'object') {
@@ -757,16 +758,18 @@
                 }
             }
 
-            // 若無 drawRecords，回退到 playedUsers
-            if (allRows.length === 0) {
-                for (const name in currentPlayedUsers) {
-                    const u = currentPlayedUsers[name];
+            // 收集 playedUsers 中的最新紀錄（如果玩家在 drawRecords 中沒有對應紀錄才加入）
+            for (const name in currentPlayedUsers) {
+                const u = currentPlayedUsers[name];
+                if (!u || !u.time) continue;
+                const existing = allRows.some(r => r.user === name && r.time === u.time);
+                if (!existing) {
                     allRows.push({
                         user: name,
                         group: u.group || "",
                         won: u.won || "",
                         code: u.code || "",
-                        time: u.time || 0
+                        time: u.time
                     });
                 }
             }
