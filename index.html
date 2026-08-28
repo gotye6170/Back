@@ -17,7 +17,7 @@
         .shop-card { background: white; border-radius: 20px; border: 1px solid #e5e7eb; box-shadow: 0 4px 12px rgba(0,0,0,0.04); padding: 16px; }
         .wallet-card { background: white; border-radius: 16px; border: 1px solid #f1f5f9; padding: 12px; margin-bottom: 8px; }
         .pending-item { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 10px 14px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
-        .player-perm-item { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 8px 14px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .player-perm-item { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 8px 14px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
         .setting-card { background: white; border-radius: 16px; border: 1px solid #e5e7eb; padding: 16px; }
     </style>
 </head>
@@ -46,17 +46,17 @@
             </div>
         </div>
 
-        <!-- ⚙️ 抽獎設定（新增） -->
+        <!-- ⚙️ 全域設定 -->
         <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
-            <h2 class="font-black text-slate-700 mb-4">⚙️ 抽獎設定</h2>
+            <h2 class="font-black text-slate-700 mb-4">⚙️ 全域抽獎次數設定</h2>
             <div class="setting-card flex items-center gap-4">
                 <div class="flex-grow">
-                    <label class="field-label">每位玩家可抽次數</label>
+                    <label class="field-label">每位玩家預設可抽次數</label>
                     <input type="number" id="maxDrawsInput" class="field-input" min="1" value="1">
                 </div>
                 <button id="saveMaxDrawsBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2 rounded-xl transition-all">💾 儲存</button>
             </div>
-            <p class="text-xs text-gray-500 mt-2">設定後，每位玩家在活動期間可抽獎的最大次數。例如設為 2，每位玩家可以抽 2 次。</p>
+            <p class="text-xs text-gray-500 mt-2">這是全域預設值，若未針對個別玩家設定次數，將使用此值。</p>
         </section>
 
         <!-- 📊 點數記錄 -->
@@ -98,14 +98,14 @@
             <div id="shopItemList" class="grid grid-cols-1 md:grid-cols-2 gap-4"><p class="text-gray-400 text-sm col-span-2">讀取中...</p></div>
         </section>
 
-        <!-- 👥 玩家抽獎權限 -->
+        <!-- 👥 玩家抽獎權限與次數設定 -->
         <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
-            <h2 class="font-black text-slate-700 mb-4">👥 玩家抽獎權限</h2>
-            <p class="text-xs text-gray-500 mb-3">開關每個玩家的抽獎資格（關閉後玩家將無法選擇該名字）</p>
+            <h2 class="font-black text-slate-700 mb-4">👥 玩家抽獎權限與次數設定</h2>
+            <p class="text-xs text-gray-500 mb-3">設定每個玩家的抽獎次數上限（留空使用全域預設）與啟用/禁用</p>
             <div id="playerPermList"><p class="text-gray-400 text-sm">讀取中...</p></div>
         </section>
 
-        <!-- 👑 中獎名單（含抽獎次數） -->
+        <!-- 👑 中獎名單 -->
         <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="font-black text-slate-700">👑 中獎名單（共 <span id="winnerCount">0</span> 筆）</h2>
@@ -157,7 +157,7 @@
         </div>
     </div>
 
-    <script type="module">
+        <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
         import { getDatabase, ref, onValue, update, remove, set, get, runTransaction, push } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-database.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
@@ -168,7 +168,6 @@
             databaseURL: "https://daidaikunbao-default-rtdb.firebaseio.com/"
         };
 
-        // 🔥 使用獨立的管理員 Firebase App 實例，避免被主程式的匿名登入影響
         const adminApp = initializeApp(firebaseConfig, "adminApp");
         const db = getDatabase(adminApp);
         const auth = getAuth(adminApp);
@@ -189,9 +188,9 @@
         let pendingPoints = {};
         let redeemRequests = {};
         let disabledPlayers = {};
+        let drawLimits = {};
         let editingPrizeIds = new Set();
         let dbListenersStarted = false;
-        let maxDrawsPerPlayer = 1; // 預設
 
         // ---------- 通用輔助 ----------
         function escapeHtml(str) { return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
@@ -283,23 +282,25 @@
                 set(ref(db, "settings/closed"), next).catch(err => alert("❌ 設定失敗：" + err.message));
             });
 
-            // 讀取抽獎次數設定
+            // 讀取全域預設
             onValue(ref(db, "settings/global/maxDrawsPerPlayer"), (snap) => {
                 const val = snap.val();
                 if (val && Number.isInteger(val) && val > 0) {
-                    maxDrawsPerPlayer = val;
+                    document.getElementById("maxDrawsInput").value = val;
                 } else {
-                    maxDrawsPerPlayer = 1;
+                    document.getElementById("maxDrawsInput").value = 1;
                 }
-                document.getElementById("maxDrawsInput").value = maxDrawsPerPlayer;
+            });
+
+            // 讀取個別設定
+            onValue(ref(db, "drawLimits"), (snap) => {
+                drawLimits = snap.val() || {};
+                renderPlayerPermList();
             });
 
             onValue(ref(db, "prizes"), (snapshot) => { currentPrizes = snapshot.val() || {}; renderPrizeList(); }, (err) => { console.error(err); });
             onValue(ref(db, "prizeCodes"), (snapshot) => { currentPrizeCodes = snapshot.val() || {}; renderPrizeList(); });
-            onValue(ref(db, "playedUsers"), (snapshot) => {
-                currentPlayedUsers = snapshot.val() || {};
-                renderWinnerTable();
-            });
+            onValue(ref(db, "playedUsers"), (snapshot) => { currentPlayedUsers = snapshot.val() || {}; renderWinnerTable(); });
             onValue(ref(db, "pointUsers"), (snapshot) => { currentPointUsers = snapshot.val() || {}; renderWalletList(); });
             onValue(ref(db, "shopItems"), (snapshot) => { currentShopItems = snapshot.val() || {}; renderShopItemList(); });
             onValue(ref(db, "pendingPoints"), (snapshot) => { pendingPoints = snapshot.val() || {}; renderPendingPoints(); });
@@ -307,7 +308,7 @@
             onValue(ref(db, "disabledPlayers"), (snapshot) => { disabledPlayers = snapshot.val() || {}; renderPlayerPermList(); });
         }
 
-        // ---------- 儲存抽獎次數設定 ----------
+        // ---------- 儲存全域抽獎次數設定 ----------
         document.getElementById("saveMaxDrawsBtn").addEventListener("click", async () => {
             const val = parseInt(document.getElementById("maxDrawsInput").value);
             if (!val || val < 1) { alert("請輸入大於 0 的整數"); return; }
@@ -316,6 +317,63 @@
                 alert("✅ 已儲存");
             } catch(e) { alert("❌ 儲存失敗：" + e.message); }
         });
+
+        // ---------- 渲染玩家抽獎權限與次數設定 ----------
+        function renderPlayerPermList() {
+            const container = document.getElementById("playerPermList");
+            container.innerHTML = allPlayerNames.map(name => {
+                const isDisabled = disabledPlayers[name] === true;
+                const limitVal = (drawLimits[name] !== undefined) ? drawLimits[name] : "";
+                return `<div class="player-perm-item">
+                    <span class="font-bold text-sm flex-shrink-0">${escapeHtml(name)}</span>
+                    <label class="inline-flex items-center gap-2 cursor-pointer flex-shrink-0">
+                        <input type="checkbox" class="player-perm-toggle" data-name="${escapeAttr(name)}" ${isDisabled ? 'checked' : ''}>
+                        <span class="text-xs">禁用</span>
+                    </label>
+                    <div class="flex items-center gap-1 ml-auto">
+                        <label class="text-xs text-gray-500">次數上限</label>
+                        <input type="number" class="field-input w-16 text-center player-limit-input" data-name="${escapeAttr(name)}" value="${limitVal}" min="0" placeholder="預設">
+                        <button class="save-player-limit bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-lg" data-name="${escapeAttr(name)}">儲存</button>
+                    </div>
+                </div>`;
+            }).join("");
+
+            container.querySelectorAll(".player-perm-toggle").forEach(cb => {
+                cb.addEventListener("change", async (e) => {
+                    const name = e.target.dataset.name;
+                    const checked = e.target.checked;
+                    try {
+                        if (checked) {
+                            await set(ref(db, `disabledPlayers/${name}`), true);
+                        } else {
+                            await remove(ref(db, `disabledPlayers/${name}`));
+                        }
+                    } catch(err) { alert("更新失敗：" + err.message); e.target.checked = !checked; }
+                });
+            });
+
+            container.querySelectorAll(".save-player-limit").forEach(btn => {
+                btn.addEventListener("click", async (e) => {
+                    const name = e.target.dataset.name;
+                    const input = container.querySelector(`.player-limit-input[data-name="${name}"]`);
+                    const val = input.value.trim();
+                    try {
+                        if (val === "") {
+                            // 清除個別設定，改用全域預設
+                            await remove(ref(db, `drawLimits/${name}`));
+                        } else {
+                            const num = parseInt(val);
+                            if (isNaN(num) || num < 0) {
+                                alert("請輸入 0 或正整數");
+                                return;
+                            }
+                            await set(ref(db, `drawLimits/${name}`), num);
+                        }
+                        alert("✅ 已儲存");
+                    } catch(err) { alert("❌ 儲存失敗：" + err.message); }
+                });
+            });
+        }
 
         // ---------- 點數記錄 ----------
         function renderPendingPoints() {
@@ -660,39 +718,7 @@
             await remove(ref(db, `shopItems/${id}`)); alert("✅ 已刪除");
         }
 
-        // ---------- 玩家抽獎權限管理 ----------
-        function renderPlayerPermList() {
-            const container = document.getElementById("playerPermList");
-            container.innerHTML = allPlayerNames.map(name => {
-                const isDisabled = disabledPlayers[name] === true;
-                return `<div class="player-perm-item">
-                    <span class="font-bold text-sm">${escapeHtml(name)}</span>
-                    <label class="inline-flex items-center gap-2 cursor-pointer">
-                        <span class="text-xs text-gray-500">${isDisabled ? '禁用' : '啟用'}</span>
-                        <input type="checkbox" class="player-perm-toggle" data-name="${escapeAttr(name)}" ${isDisabled ? 'checked' : ''}>
-                    </label>
-                </div>`;
-            }).join("");
-
-            container.querySelectorAll(".player-perm-toggle").forEach(cb => {
-                cb.addEventListener("change", async (e) => {
-                    const name = e.target.dataset.name;
-                    const checked = e.target.checked;
-                    try {
-                        if (checked) {
-                            await set(ref(db, `disabledPlayers/${name}`), true);
-                        } else {
-                            await remove(ref(db, `disabledPlayers/${name}`));
-                        }
-                    } catch(err) {
-                        alert("更新失敗：" + err.message);
-                        e.target.checked = !checked;
-                    }
-                });
-            });
-        }
-
-        // ---------- 中獎名單（顯示抽獎次數） ----------
+        // ---------- 中獎名單 ----------
         function renderWinnerTable() {
             const tbody = document.getElementById("winnerTableBody"), empty = document.getElementById("winnerEmptyState");
             const users = Object.keys(currentPlayedUsers);
@@ -767,7 +793,7 @@
             document.getElementById("saveMaxDrawsBtn").addEventListener("click", saveMaxDraws);
         });
 
-        // 儲存抽獎次數設定函式
+        // 儲存全域抽獎次數設定函式
         async function saveMaxDraws() {
             const val = parseInt(document.getElementById("maxDrawsInput").value);
             if (!val || val < 1) { alert("請輸入大於 0 的整數"); return; }
