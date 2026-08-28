@@ -46,7 +46,7 @@
             </div>
         </div>
 
-        <!-- ⚙️ 全域設定 -->
+        <!-- ⚙️ 全域抽獎次數設定 -->
         <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
             <h2 class="font-black text-slate-700 mb-4">⚙️ 全域抽獎次數設定</h2>
             <div class="setting-card flex items-center gap-4">
@@ -56,7 +56,7 @@
                 </div>
                 <button id="saveMaxDrawsBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2 rounded-xl transition-all">💾 儲存</button>
             </div>
-            <p class="text-xs text-gray-500 mt-2">這是全域預設值，若未針對個別玩家設定次數，將使用此值。</p>
+            <p class="text-xs text-gray-500 mt-2">這是全域預設值，若未針對個別玩家設定次數，將使用此值。修改後不會自動重置玩家已抽次數；如需重置，請在下方「玩家抽獎權限與次數設定」中逐位儲存個別次數。</p>
         </section>
 
         <!-- 📊 點數記錄 -->
@@ -101,7 +101,7 @@
         <!-- 👥 玩家抽獎權限與次數設定 -->
         <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
             <h2 class="font-black text-slate-700 mb-4">👥 玩家抽獎權限與次數設定</h2>
-            <p class="text-xs text-gray-500 mb-3">設定每個玩家的抽獎次數上限（留空使用全域預設）與啟用/禁用</p>
+            <p class="text-xs text-gray-500 mb-3">設定每個玩家的抽獎次數上限（留空使用全域預設）。儲存個別次數時會自動將該玩家的已抽次數歸零，使其可重新抽獎。</p>
             <div id="playerPermList"><p class="text-gray-400 text-sm">讀取中...</p></div>
         </section>
 
@@ -359,7 +359,6 @@
                     const val = input.value.trim();
                     try {
                         if (val === "") {
-                            // 清除個別設定，改用全域預設
                             await remove(ref(db, `drawLimits/${name}`));
                         } else {
                             const num = parseInt(val);
@@ -369,6 +368,12 @@
                             }
                             await set(ref(db, `drawLimits/${name}`), num);
                         }
+                        // 🔥 重置該玩家的已抽次數，使新上限立即生效
+                        const playedRef = ref(db, `playedUsers/${name}`);
+                        await runTransaction(playedRef, (cur) => {
+                            if (cur === null) return cur; // 玩家尚未抽過，無需處理
+                            return { ...cur, drawCount: 0 };
+                        }).catch(() => {});
                         alert("✅ 已儲存");
                     } catch(err) { alert("❌ 儲存失敗：" + err.message); }
                 });
@@ -793,7 +798,6 @@
             document.getElementById("saveMaxDrawsBtn").addEventListener("click", saveMaxDraws);
         });
 
-        // 儲存全域抽獎次數設定函式
         async function saveMaxDraws() {
             const val = parseInt(document.getElementById("maxDrawsInput").value);
             if (!val || val < 1) { alert("請輸入大於 0 的整數"); return; }
