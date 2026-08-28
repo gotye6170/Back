@@ -56,7 +56,7 @@
                 </div>
                 <button id="saveMaxDrawsBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2 rounded-xl transition-all">💾 儲存</button>
             </div>
-            <p class="text-xs text-gray-500 mt-2">這是全域預設值，若未針對個別玩家設定次數，將使用此值。修改後不會自動重置玩家已抽次數；如需重置，請在下方「玩家抽獎權限與次數設定」中逐位儲存個別次數。</p>
+            <p class="text-xs text-gray-500 mt-2">這是全域預設值，若未針對個別玩家設定次數，將使用此值。</p>
         </section>
 
         <!-- 📊 點數記錄 -->
@@ -101,14 +101,14 @@
         <!-- 👥 玩家抽獎權限與次數設定 -->
         <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
             <h2 class="font-black text-slate-700 mb-4">👥 玩家抽獎權限與次數設定</h2>
-            <p class="text-xs text-gray-500 mb-3">設定每個玩家的抽獎次數上限（留空使用全域預設）。儲存個別次數時會自動將該玩家的已抽次數歸零，使其可重新抽獎。</p>
+            <p class="text-xs text-gray-500 mb-3">設定每個玩家的抽獎次數上限（留空使用全域預設）。儲存個別次數時會自動將該玩家的已抽次數歸零。</p>
             <div id="playerPermList"><p class="text-gray-400 text-sm">讀取中...</p></div>
         </section>
 
-        <!-- 👑 中獎名單 -->
+        <!-- 👑 中獎名單（含歷史紀錄） -->
         <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
             <div class="flex items-center justify-between mb-4">
-                <h2 class="font-black text-slate-700">👑 中獎名單（共 <span id="winnerCount">0</span> 筆）</h2>
+                <h2 class="font-black text-slate-700">👑 抽獎紀錄（共 <span id="winnerCount">0</span> 筆）</h2>
                 <button id="exportCSVBtn" class="bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">⬇ 匯出 CSV</button>
             </div>
             <div class="overflow-x-auto">
@@ -117,8 +117,7 @@
                         <tr class="text-left text-gray-400 text-xs border-b">
                             <th class="py-2 pr-4">姓名</th>
                             <th class="py-2 pr-4">群組</th>
-                            <th class="py-2 pr-4">抽獎次數</th>
-                            <th class="py-2 pr-4">最新中獎項目</th>
+                            <th class="py-2 pr-4">中獎項目</th>
                             <th class="py-2 pr-4">序號 / 連結</th>
                             <th class="py-2 pr-4">時間</th>
                             <th class="py-2 pr-4">操作</th>
@@ -133,8 +132,8 @@
         <!-- ⚠️ 危險區域 -->
         <section class="bg-rose-50 rounded-3xl border border-rose-200 shadow p-5 md:p-6">
             <h2 class="font-black text-rose-600 mb-2">⚠️ 危險區域</h2>
-            <p class="text-xs text-rose-500 mb-4">以下操作無法復原，請確認活動真的要「重新開始」再執行（例如測試完畢、正式開賣前）。</p>
-            <button id="resetDrawDataBtn" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">🗑️ 清空所有中獎紀錄（不影響獎品設定）</button>
+            <p class="text-xs text-rose-500 mb-4">以下操作無法復原，請確認活動真的要「重新開始」再執行。</p>
+            <button id="resetDrawDataBtn" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">🗑️ 清空所有抽獎紀錄（不影響獎品設定）</button>
         </section>
     </div>
 
@@ -168,6 +167,7 @@
             databaseURL: "https://daidaikunbao-default-rtdb.firebaseio.com/"
         };
 
+        // 🔥 使用獨立的管理員 Firebase App 實例
         const adminApp = initializeApp(firebaseConfig, "adminApp");
         const db = getDatabase(adminApp);
         const auth = getAuth(adminApp);
@@ -189,6 +189,7 @@
         let redeemRequests = {};
         let disabledPlayers = {};
         let drawLimits = {};
+        let drawRecords = {};
         let editingPrizeIds = new Set();
         let dbListenersStarted = false;
 
@@ -298,9 +299,18 @@
                 renderPlayerPermList();
             });
 
+            // 讀取抽獎紀錄
+            onValue(ref(db, "drawRecords"), (snap) => {
+                drawRecords = snap.val() || {};
+                renderWinnerTable();
+            });
+
             onValue(ref(db, "prizes"), (snapshot) => { currentPrizes = snapshot.val() || {}; renderPrizeList(); }, (err) => { console.error(err); });
             onValue(ref(db, "prizeCodes"), (snapshot) => { currentPrizeCodes = snapshot.val() || {}; renderPrizeList(); });
-            onValue(ref(db, "playedUsers"), (snapshot) => { currentPlayedUsers = snapshot.val() || {}; renderWinnerTable(); });
+            onValue(ref(db, "playedUsers"), (snapshot) => {
+                currentPlayedUsers = snapshot.val() || {};
+                renderWinnerTable();
+            });
             onValue(ref(db, "pointUsers"), (snapshot) => { currentPointUsers = snapshot.val() || {}; renderWalletList(); });
             onValue(ref(db, "shopItems"), (snapshot) => { currentShopItems = snapshot.val() || {}; renderShopItemList(); });
             onValue(ref(db, "pendingPoints"), (snapshot) => { pendingPoints = snapshot.val() || {}; renderPendingPoints(); });
@@ -368,10 +378,10 @@
                             }
                             await set(ref(db, `drawLimits/${name}`), num);
                         }
-                        // 🔥 重置該玩家的已抽次數，使新上限立即生效
+                        // 重置該玩家的已抽次數，使新上限立即生效
                         const playedRef = ref(db, `playedUsers/${name}`);
                         await runTransaction(playedRef, (cur) => {
-                            if (cur === null) return cur; // 玩家尚未抽過，無需處理
+                            if (cur === null) return cur;
                             return { ...cur, drawCount: 0 };
                         }).catch(() => {});
                         alert("✅ 已儲存");
@@ -723,64 +733,126 @@
             await remove(ref(db, `shopItems/${id}`)); alert("✅ 已刪除");
         }
 
-        // ---------- 中獎名單 ----------
+        // ---------- 抽獎紀錄（顯示所有歷史） ----------
         function renderWinnerTable() {
-            const tbody = document.getElementById("winnerTableBody"), empty = document.getElementById("winnerEmptyState");
-            const users = Object.keys(currentPlayedUsers);
-            document.getElementById("winnerCount").innerText = users.length;
-            if (!users.length) { tbody.innerHTML=""; empty.classList.remove("hidden"); return; }
+            const tbody = document.getElementById("winnerTableBody");
+            const empty = document.getElementById("winnerEmptyState");
+            const allRows = [];
+
+            for (const name in drawRecords) {
+                const records = drawRecords[name];
+                if (records && typeof records === 'object') {
+                    for (const key in records) {
+                        const rec = records[key];
+                        if (rec && rec.time) {
+                            allRows.push({
+                                user: name,
+                                group: rec.group || "",
+                                won: rec.won || "",
+                                code: rec.code || "",
+                                time: rec.time
+                            });
+                        }
+                    }
+                }
+            }
+
+            // 若無 drawRecords，回退到 playedUsers
+            if (allRows.length === 0) {
+                for (const name in currentPlayedUsers) {
+                    const u = currentPlayedUsers[name];
+                    allRows.push({
+                        user: name,
+                        group: u.group || "",
+                        won: u.won || "",
+                        code: u.code || "",
+                        time: u.time || 0
+                    });
+                }
+            }
+
+            allRows.sort((a, b) => (b.time || 0) - (a.time || 0));
+            document.getElementById("winnerCount").innerText = allRows.length;
+
+            if (!allRows.length) {
+                tbody.innerHTML = "";
+                empty.classList.remove("hidden");
+                return;
+            }
             empty.classList.add("hidden");
-            const rows = users.map(u => ({
-                user: u,
-                won: currentPlayedUsers[u].won,
-                code: currentPlayedUsers[u].code,
-                time: currentPlayedUsers[u].time,
-                group: currentPlayedUsers[u].group,
-                drawCount: currentPlayedUsers[u].drawCount || 0
-            })).sort((a,b) => (b.time||0)-(a.time||0));
-            tbody.innerHTML = rows.map(r => {
+
+            tbody.innerHTML = allRows.map(r => {
                 const timeStr = r.time ? new Date(r.time).toLocaleString("zh-TW") : "-";
                 return `<tr class="border-b">
                     <td class="py-2 font-bold">${escapeHtml(r.user)}</td>
-                    <td>${escapeHtml(r.group||"-")}</td>
-                    <td class="text-center font-bold">${r.drawCount}</td>
-                    <td class="text-pink-600 font-bold">${escapeHtml(r.won||"-")}</td>
-                    <td class="break-all">${escapeHtml(r.code||"-")}</td>
+                    <td>${escapeHtml(r.group || "-")}</td>
+                    <td class="text-pink-600 font-bold">${escapeHtml(r.won || "-")}</td>
+                    <td class="break-all">${escapeHtml(r.code || "-")}</td>
                     <td class="text-xs">${timeStr}</td>
-                    <td><button class="delete-winner text-rose-400 text-xs font-bold" data-name="${escapeAttr(r.user)}">🗑️ 刪除</button></td>
+                    <td><button class="delete-winner text-rose-400 text-xs font-bold" data-name="${escapeAttr(r.user)}">🗑️ 刪除玩家紀錄</button></td>
                 </tr>`;
             }).join("");
-            tbody.querySelectorAll(".delete-winner").forEach(b => b.addEventListener("click", e => deleteWinnerRecord(e.target.dataset.name)));
-        }
 
-        async function deleteWinnerRecord(name) {
-            if (!confirm(`刪除「${name}」的中獎紀錄？`)) return;
-            await remove(ref(db, `playedUsers/${name}`));
-            alert("✅ 已刪除");
+            tbody.querySelectorAll(".delete-winner").forEach(btn => {
+                btn.addEventListener("click", async (e) => {
+                    const name = e.target.dataset.name;
+                    if (!confirm(`刪除「${name}」的所有抽獎紀錄？`)) return;
+                    try {
+                        await remove(ref(db, `drawRecords/${name}`));
+                        await remove(ref(db, `playedUsers/${name}`));
+                        alert("✅ 已刪除");
+                    } catch(err) { alert("❌ 刪除失敗：" + err.message); }
+                });
+            });
         }
 
         function exportWinnersCSV() {
-            const users = Object.keys(currentPlayedUsers);
-            if (!users.length) { alert("無資料"); return; }
-            const rows = users.map(u => ({
-                user: u,
-                group: currentPlayedUsers[u].group || "",
-                drawCount: currentPlayedUsers[u].drawCount || 0,
-                won: currentPlayedUsers[u].won || "",
-                code: currentPlayedUsers[u].code || "",
-                time: currentPlayedUsers[u].time ? new Date(currentPlayedUsers[u].time).toLocaleString("zh-TW") : ""
-            }));
-            const lines = [["姓名","群組","抽獎次數","最新中獎項目","序號/連結","時間"].join(",")];
+            const rows = [];
+            for (const name in drawRecords) {
+                const records = drawRecords[name];
+                if (records && typeof records === 'object') {
+                    for (const key in records) {
+                        const rec = records[key];
+                        rows.push({
+                            user: name,
+                            group: rec.group || "",
+                            won: rec.won || "",
+                            code: rec.code || "",
+                            time: rec.time ? new Date(rec.time).toLocaleString("zh-TW") : ""
+                        });
+                    }
+                }
+            }
+            if (!rows.length) {
+                for (const name in currentPlayedUsers) {
+                    const u = currentPlayedUsers[name];
+                    rows.push({
+                        user: name,
+                        group: u.group || "",
+                        won: u.won || "",
+                        code: u.code || "",
+                        time: u.time ? new Date(u.time).toLocaleString("zh-TW") : ""
+                    });
+                }
+            }
+            if (!rows.length) { alert("無資料"); return; }
+            const lines = [["姓名","群組","中獎項目","序號/連結","時間"].join(",")];
             rows.forEach(r => {
-                lines.push([r.user, r.group, r.drawCount, r.won, r.code, r.time].map(csvEscape).join(","));
+                lines.push([r.user, r.group, r.won, r.code, r.time].map(csvEscape).join(","));
             });
             const blob = new Blob(["\uFEFF"+lines.join("\n")], {type:"text/csv"});
-            const a = document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`中獎名單_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `抽獎紀錄_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
         }
 
         async function resetDrawData() {
-            if (prompt("輸入 RESET 確認")!=="RESET") return;
-            await remove(ref(db,"playedUsers"));
+            if (prompt("輸入 RESET 確認") !== "RESET") return;
+            await Promise.all([
+                remove(ref(db, "playedUsers")),
+                remove(ref(db, "drawRecords"))
+            ]);
             alert("✅ 已清空所有抽獎紀錄");
         }
 
