@@ -397,27 +397,53 @@
             });
         }
 
-// ---------- 抽獎紀錄（只使用 drawRecords，不重複） ----------
+// ---------- 抽獎紀錄（合併 drawRecords 與 playedUsers，避免重複） ----------
 function renderWinnerTable() {
     const tbody = document.getElementById("winnerTableBody");
     const empty = document.getElementById("winnerEmptyState");
     const allRows = [];
+    const seen = new Set();
 
-    // 只收集 drawRecords 中的紀錄
+    // 1. 先收集 drawRecords 中的所有紀錄
     for (const name in drawRecords) {
         const records = drawRecords[name];
         if (records && typeof records === 'object') {
             for (const key in records) {
                 const rec = records[key];
                 if (rec && rec.time) {
-                    allRows.push({
-                        user: name,
-                        group: rec.group || "",
-                        won: rec.won || "",
-                        code: rec.code || "",
-                        time: rec.time
-                    });
+                    const uniqueKey = `${name}_${rec.time}`;
+                    if (!seen.has(uniqueKey)) {
+                        seen.add(uniqueKey);
+                        allRows.push({
+                            user: name,
+                            group: rec.group || "",
+                            won: rec.won || "",
+                            code: rec.code || "",
+                            time: rec.time
+                        });
+                    }
                 }
+            }
+        }
+    }
+
+    // 2. 再補充 playedUsers 中尚未出現在 drawRecords 的玩家最新紀錄
+    for (const name in currentPlayedUsers) {
+        const u = currentPlayedUsers[name];
+        if (!u || !u.time) continue;
+        // 檢查該玩家是否在 drawRecords 中有任何紀錄
+        const hasDrawRecord = drawRecords[name] && Object.keys(drawRecords[name]).length > 0;
+        if (!hasDrawRecord) {
+            const uniqueKey = `${name}_${u.time}`;
+            if (!seen.has(uniqueKey)) {
+                seen.add(uniqueKey);
+                allRows.push({
+                    user: name,
+                    group: u.group || "",
+                    won: u.won || "",
+                    code: u.code || "",
+                    time: u.time
+                });
             }
         }
     }
