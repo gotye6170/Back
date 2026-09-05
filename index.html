@@ -19,6 +19,8 @@
         .pending-item { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 10px 14px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
         .player-perm-item { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 8px 14px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
         .setting-card { background: white; border-radius: 16px; border: 1px solid #e5e7eb; padding: 16px; }
+        .slot-symbol-card { background: white; border-radius: 16px; border: 1px solid #e5e7eb; padding: 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+        .slot-prize-card { background: white; border-radius: 16px; border: 1px solid #e5e7eb; padding: 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
     </style>
 </head>
 <body class="min-h-screen p-4 md:p-8">
@@ -46,17 +48,31 @@
             </div>
         </div>
 
-        <!-- ⚙️ 全域抽獎次數設定 -->
+        <!-- ⚙️ 遊戲設定（包含遊戲模式、拉霸花費） -->
         <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
-            <h2 class="font-black text-slate-700 mb-4">⚙️ 全域抽獎次數設定</h2>
-            <div class="setting-card flex items-center gap-4">
-                <div class="flex-grow">
-                    <label class="field-label">每位玩家預設可抽次數</label>
+            <h2 class="font-black text-slate-700 mb-4">⚙️ 遊戲設定</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="setting-card">
+                    <label class="field-label">開放遊戲模式</label>
+                    <select id="gameModeSelect" class="field-input">
+                        <option value="both">扭蛋機 + 拉霸機</option>
+                        <option value="gacha">僅扭蛋機</option>
+                        <option value="slot">僅拉霸機</option>
+                    </select>
+                </div>
+                <div class="setting-card">
+                    <label class="field-label">每位玩家預設可抽次數（扭蛋）</label>
                     <input type="number" id="maxDrawsInput" class="field-input" min="1" value="1">
                 </div>
-                <button id="saveMaxDrawsBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2 rounded-xl transition-all">💾 儲存</button>
+                <div class="setting-card">
+                    <label class="field-label">拉霸機每次花費點數</label>
+                    <input type="number" id="slotCostInput" class="field-input" min="1" value="20">
+                </div>
             </div>
-            <p class="text-xs text-gray-500 mt-2">這是全域預設值，若未針對個別玩家設定次數，將使用此值。</p>
+            <div class="flex gap-2 mt-4">
+                <button id="saveGameSettingsBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2 rounded-xl transition-all">💾 儲存遊戲設定</button>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">遊戲模式變更後，玩家端的選項會立即更新；拉霸花費點數設定後，玩家每次拉霸將扣除該點數。</p>
         </section>
 
         <!-- 📊 點數記錄 -->
@@ -71,13 +87,31 @@
             <div id="redeemRequestsList"><p class="text-gray-400 text-sm">尚無兌換記錄</p></div>
         </section>
 
-        <!-- 📋 獎品管理 -->
+        <!-- 📋 獎品管理（扭蛋機） -->
         <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
             <div class="flex items-center justify-between mb-4">
-                <h2 class="font-black text-slate-700">📋 獎品管理</h2>
+                <h2 class="font-black text-slate-700">📋 扭蛋機獎品管理</h2>
                 <button id="addNewPrizeBtn" class="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">＋ 新增獎品</button>
             </div>
             <div id="prizeList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        </section>
+
+        <!-- 🎰 拉霸機符號管理 -->
+        <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="font-black text-slate-700">🎰 拉霸機符號管理</h2>
+                <button id="addSlotSymbolBtn" class="bg-purple-500 hover:bg-purple-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">＋ 新增符號</button>
+            </div>
+            <div id="slotSymbolList" class="space-y-2"><p class="text-gray-400 text-sm">載入中...</p></div>
+        </section>
+
+        <!-- 🎁 拉霸機獎品管理 -->
+        <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="font-black text-slate-700">🎁 拉霸機獎品管理</h2>
+                <button id="addSlotPrizeBtn" class="bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">＋ 新增獎品</button>
+            </div>
+            <div id="slotPrizeList" class="space-y-2"><p class="text-gray-400 text-sm">載入中...</p></div>
         </section>
 
         <!-- 🪙 點數錢包管理 -->
@@ -105,10 +139,10 @@
             <div id="playerPermList"><p class="text-gray-400 text-sm">讀取中...</p></div>
         </section>
 
-        <!-- 👑 抽獎紀錄（含歷史紀錄） -->
+        <!-- 👑 抽獎紀錄（含扭蛋與拉霸） -->
         <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
             <div class="flex items-center justify-between mb-4">
-                <h2 class="font-black text-slate-700">👑 抽獎紀錄（共 <span id="winnerCount">0</span> 筆）</h2>
+                <h2 class="font-black text-slate-700">👑 抽獎紀錄（扭蛋機 + 拉霸機）</h2>
                 <button id="exportCSVBtn" class="bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">⬇ 匯出 CSV</button>
             </div>
             <div class="overflow-x-auto">
@@ -116,8 +150,8 @@
                     <thead>
                         <tr class="text-left text-gray-400 text-xs border-b">
                             <th class="py-2 pr-4">姓名</th>
-                            <th class="py-2 pr-4">群組</th>
-                            <th class="py-2 pr-4">中獎項目</th>
+                            <th class="py-2 pr-4">類型</th>
+                            <th class="py-2 pr-4">內容</th>
                             <th class="py-2 pr-4">序號 / 連結</th>
                             <th class="py-2 pr-4">時間</th>
                             <th class="py-2 pr-4">操作</th>
@@ -167,7 +201,7 @@
             databaseURL: "https://daidaikunbao-default-rtdb.firebaseio.com/"
         };
 
-        // 獨立的管理員 Firebase App 實例
+        // 🔥 使用獨立的管理員 Firebase App 實例
         const adminApp = initializeApp(firebaseConfig, "adminApp");
         const db = getDatabase(adminApp);
         const auth = getAuth(adminApp);
@@ -190,9 +224,12 @@
         let disabledPlayers = {};
         let drawLimits = {};
         let drawRecords = {};
+        let slotSymbols = {};
+        let slotPrizes = {};
+        let slotRecords = {};
         let editingPrizeIds = new Set();
         let dbListenersStarted = false;
-        let defaultMaxDraws = 1; // 新增
+        let defaultMaxDraws = 1;
 
         // ---------- 通用輔助 ----------
         function escapeHtml(str) { return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
@@ -289,28 +326,54 @@
                 const val = snap.val();
                 defaultMaxDraws = (val && Number.isInteger(val) && val > 0) ? val : 1;
                 document.getElementById("maxDrawsInput").value = defaultMaxDraws;
-                renderPlayerPermList(); // 重新渲染以更新剩餘次數
+                renderPlayerPermList();
             });
 
-            // 讀取個別設定
+            // 讀取遊戲模式
+            onValue(ref(db, "settings/global/gameMode"), (snap) => {
+                const mode = snap.val() || "both";
+                document.getElementById("gameModeSelect").value = mode;
+            });
+
+            // 讀取拉霸花費
+            onValue(ref(db, "slotSettings"), (snap) => {
+                const data = snap.val() || {};
+                document.getElementById("slotCostInput").value = data.cost || 20;
+            });
+
+            // 讀取個別抽獎次數限制
             onValue(ref(db, "drawLimits"), (snap) => {
                 drawLimits = snap.val() || {};
                 renderPlayerPermList();
             });
 
-            // 讀取抽獎紀錄
+            // 讀取抽獎紀錄（扭蛋）
             onValue(ref(db, "drawRecords"), (snap) => {
                 drawRecords = snap.val() || {};
                 renderWinnerTable();
             });
 
+            // 讀取拉霸符號
+            onValue(ref(db, "slotSymbols"), (snap) => {
+                slotSymbols = snap.val() || {};
+                renderSlotSymbolList();
+            });
+
+            // 讀取拉霸獎品
+            onValue(ref(db, "slotPrizes"), (snap) => {
+                slotPrizes = snap.val() || {};
+                renderSlotPrizeList();
+            });
+
+            // 讀取拉霸紀錄
+            onValue(ref(db, "slotRecords"), (snap) => {
+                slotRecords = snap.val() || {};
+                renderWinnerTable();
+            });
+
             onValue(ref(db, "prizes"), (snapshot) => { currentPrizes = snapshot.val() || {}; renderPrizeList(); }, (err) => { console.error(err); });
             onValue(ref(db, "prizeCodes"), (snapshot) => { currentPrizeCodes = snapshot.val() || {}; renderPrizeList(); });
-            onValue(ref(db, "playedUsers"), (snapshot) => {
-                currentPlayedUsers = snapshot.val() || {};
-                renderWinnerTable();
-                renderPlayerPermList();
-            });
+            onValue(ref(db, "playedUsers"), (snapshot) => { currentPlayedUsers = snapshot.val() || {}; renderWinnerTable(); renderPlayerPermList(); });
             onValue(ref(db, "pointUsers"), (snapshot) => { currentPointUsers = snapshot.val() || {}; renderWalletList(); });
             onValue(ref(db, "shopItems"), (snapshot) => { currentShopItems = snapshot.val() || {}; renderShopItemList(); });
             onValue(ref(db, "pendingPoints"), (snapshot) => { pendingPoints = snapshot.val() || {}; renderPendingPoints(); });
@@ -318,17 +381,22 @@
             onValue(ref(db, "disabledPlayers"), (snapshot) => { disabledPlayers = snapshot.val() || {}; renderPlayerPermList(); });
         }
 
-        // ---------- 儲存全域抽獎次數設定 ----------
-        document.getElementById("saveMaxDrawsBtn").addEventListener("click", async () => {
-            const val = parseInt(document.getElementById("maxDrawsInput").value);
-            if (!val || val < 1) { alert("請輸入大於 0 的整數"); return; }
+        // ---------- 儲存遊戲設定 ----------
+        document.getElementById("saveGameSettingsBtn").addEventListener("click", async () => {
+            const gameMode = document.getElementById("gameModeSelect").value;
+            const maxDraws = parseInt(document.getElementById("maxDrawsInput").value) || 1;
+            const slotCost = parseInt(document.getElementById("slotCostInput").value) || 20;
             try {
-                await set(ref(db, "settings/global/maxDrawsPerPlayer"), val);
-                alert("✅ 已儲存");
+                await Promise.all([
+                    set(ref(db, "settings/global/gameMode"), gameMode),
+                    set(ref(db, "settings/global/maxDrawsPerPlayer"), maxDraws),
+                    set(ref(db, "slotSettings/cost"), slotCost)
+                ]);
+                alert("✅ 已儲存遊戲設定");
             } catch(e) { alert("❌ 儲存失敗：" + e.message); }
         });
 
-        // ---------- 渲染玩家抽獎權限與次數設定（顯示已抽/剩餘） ----------
+        // ---------- 渲染玩家抽獎權限與次數設定 ----------
         function renderPlayerPermList() {
             const container = document.getElementById("playerPermList");
             container.innerHTML = allPlayerNames.map(name => {
@@ -337,7 +405,6 @@
                 const drawCount = currentPlayedUsers[name]?.drawCount || 0;
                 const limitNum = (drawLimits[name] !== undefined) ? drawLimits[name] : defaultMaxDraws;
                 const remaining = Math.max(limitNum - drawCount, 0);
-
                 return `<div class="player-perm-item">
                     <span class="font-bold text-sm flex-shrink-0">${escapeHtml(name)}</span>
                     <label class="inline-flex items-center gap-2 cursor-pointer flex-shrink-0">
@@ -360,11 +427,8 @@
                     const name = e.target.dataset.name;
                     const checked = e.target.checked;
                     try {
-                        if (checked) {
-                            await set(ref(db, `disabledPlayers/${name}`), true);
-                        } else {
-                            await remove(ref(db, `disabledPlayers/${name}`));
-                        }
+                        if (checked) await set(ref(db, `disabledPlayers/${name}`), true);
+                        else await remove(ref(db, `disabledPlayers/${name}`));
                     } catch(err) { alert("更新失敗：" + err.message); e.target.checked = !checked; }
                 });
             });
@@ -375,136 +439,21 @@
                     const input = container.querySelector(`.player-limit-input[data-name="${name}"]`);
                     const val = input.value.trim();
                     try {
-                        if (val === "") {
-                            await remove(ref(db, `drawLimits/${name}`));
-                        } else {
+                        if (val === "") await remove(ref(db, `drawLimits/${name}`));
+                        else {
                             const num = parseInt(val);
-                            if (isNaN(num) || num < 0) {
-                                alert("請輸入 0 或正整數");
-                                return;
-                            }
+                            if (isNaN(num) || num < 0) { alert("請輸入 0 或正整數"); return; }
                             await set(ref(db, `drawLimits/${name}`), num);
                         }
-                        // 重置該玩家的已抽次數，使新上限立即生效
                         const playedRef = ref(db, `playedUsers/${name}`);
-                        await runTransaction(playedRef, (cur) => {
-                            if (cur === null) return cur;
-                            return { ...cur, drawCount: 0 };
-                        }).catch(() => {});
+                        await runTransaction(playedRef, (cur) => cur ? { ...cur, drawCount: 0 } : cur).catch(() => {});
                         alert("✅ 已儲存");
                     } catch(err) { alert("❌ 儲存失敗：" + err.message); }
                 });
             });
         }
 
-        // ---------- 抽獎紀錄（支援單筆刪除，合併新舊資料） ----------
-        function renderWinnerTable() {
-            const tbody = document.getElementById("winnerTableBody");
-            const empty = document.getElementById("winnerEmptyState");
-            const allRows = [];
-            const seen = new Set();
-
-            // 先處理 drawRecords（新格式，每筆都有獨立 key）
-            for (const name in drawRecords) {
-                const records = drawRecords[name];
-                if (records && typeof records === 'object') {
-                    for (const key in records) {
-                        const rec = records[key];
-                        if (rec && rec.time) {
-                            const uniqueKey = `${name}_${rec.time}`;
-                            if (!seen.has(uniqueKey)) {
-                                seen.add(uniqueKey);
-                                allRows.push({
-                                    user: name,
-                                    group: rec.group || "",
-                                    won: rec.won || "",
-                                    code: rec.code || "",
-                                    time: rec.time,
-                                    source: 'drawRecords',
-                                    recordKey: key,
-                                    playerName: name
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 再處理 playedUsers 中尚未有 drawRecords 的玩家（舊資料）
-            for (const name in currentPlayedUsers) {
-                const u = currentPlayedUsers[name];
-                if (!u || !u.time) continue;
-                const hasDrawRecord = drawRecords[name] && Object.keys(drawRecords[name]).length > 0;
-                if (!hasDrawRecord) {
-                    const uniqueKey = `${name}_${u.time}`;
-                    if (!seen.has(uniqueKey)) {
-                        seen.add(uniqueKey);
-                        allRows.push({
-                            user: name,
-                            group: u.group || "",
-                            won: u.won || "",
-                            code: u.code || "",
-                            time: u.time,
-                            source: 'playedUsers',
-                            recordKey: null,
-                            playerName: name
-                        });
-                    }
-                }
-            }
-
-            allRows.sort((a, b) => (b.time || 0) - (a.time || 0));
-            document.getElementById("winnerCount").innerText = allRows.length;
-
-            if (!allRows.length) {
-                tbody.innerHTML = "";
-                empty.classList.remove("hidden");
-                return;
-            }
-            empty.classList.add("hidden");
-
-            tbody.innerHTML = allRows.map((r, index) => {
-                const timeStr = r.time ? new Date(r.time).toLocaleString("zh-TW") : "-";
-                const deleteLabel = r.source === 'drawRecords' ? '刪除此筆' : '刪除玩家全部紀錄';
-                const dataAttrs = r.source === 'drawRecords'
-                    ? `data-source="drawRecords" data-player="${escapeAttr(r.playerName)}" data-key="${escapeAttr(r.recordKey)}"`
-                    : `data-source="playedUsers" data-player="${escapeAttr(r.playerName)}"`;
-                return `<tr class="border-b">
-                    <td class="py-2 font-bold">${escapeHtml(r.user)}</td>
-                    <td>${escapeHtml(r.group || "-")}</td>
-                    <td class="text-pink-600 font-bold">${escapeHtml(r.won || "-")}</td>
-                    <td class="break-all">${escapeHtml(r.code || "-")}</td>
-                    <td class="text-xs">${timeStr}</td>
-                    <td><button class="delete-winner text-rose-400 text-xs font-bold" ${dataAttrs}>${deleteLabel}</button></td>
-                </tr>`;
-            }).join("");
-
-            // 綁定刪除事件
-            tbody.querySelectorAll(".delete-winner").forEach(btn => {
-                btn.addEventListener("click", async (e) => {
-                    const source = e.target.dataset.source;
-                    const player = e.target.dataset.player;
-                    const key = e.target.dataset.key;
-
-                    if (source === 'drawRecords' && key) {
-                        if (!confirm(`刪除「${player}」的這筆紀錄？`)) return;
-                        try {
-                            await remove(ref(db, `drawRecords/${player}/${key}`));
-                            // 可選：如果該玩家在 playedUsers 中的最新紀錄與此筆相同，也可以考慮更新 playedUsers，但先不處理
-                            alert("✅ 已刪除此筆紀錄");
-                        } catch (err) { alert("❌ 刪除失敗：" + err.message); }
-                    } else if (source === 'playedUsers') {
-                        if (!confirm(`刪除「${player}」的所有抽獎紀錄？此操作會連同抽獎次數一起清除！`)) return;
-                        try {
-                            await remove(ref(db, `playedUsers/${player}`));
-                            alert("✅ 已刪除該玩家所有紀錄");
-                        } catch (err) { alert("❌ 刪除失敗：" + err.message); }
-                    }
-                });
-            });
-        }
-
-        // ---------- 點數記錄 ----------
+        // ---------- 渲染點數記錄 ----------
         function renderPendingPoints() {
             const c = document.getElementById("pendingPointsList");
             const allIds = Object.keys(pendingPoints);
@@ -538,30 +487,24 @@
             const yearEnd = getYearEndTimestamp();
             const wRef = ref(db, `pointUsers/${p.playerName}`);
             await runTransaction(wRef, (cur) => {
-                if (!cur) {
-                    return { points: p.points, expiry: yearEnd, personalPassHash: "", boundUid: "", transactions: { [Date.now()]: { amount: p.points, timestamp: Date.now(), type: "earn" } } };
-                }
+                if (!cur) return { points: p.points, expiry: yearEnd, personalPassHash: "", boundUid: "" };
                 cur.points = (cur.points || 0) + p.points;
                 cur.expiry = yearEnd;
-                if (!cur.transactions) cur.transactions = {};
-                cur.transactions[Date.now()] = { amount: p.points, timestamp: Date.now(), type: "earn" };
                 return cur;
             });
             await update(ref(db, `pendingPoints/${id}`), { status: "approved", processedAt: Date.now() });
             alert("✅ 已發放");
         }
-
         async function rejectPoints(id) {
             if (!confirm("拒絕這筆點數？")) return;
             await update(ref(db, `pendingPoints/${id}`), { status: "rejected", processedAt: Date.now() }); alert("已拒絕");
         }
-
         async function deletePointRecord(id) {
-            if (!confirm("確定要刪除這筆點數記錄嗎？此操作無法復原。")) return;
-            try { await remove(ref(db, `pendingPoints/${id}`)); alert("✅ 點數記錄已刪除"); } catch(e) { alert("❌ 刪除失敗：" + e.message); }
+            if (!confirm("確定要刪除這筆點數記錄嗎？")) return;
+            await remove(ref(db, `pendingPoints/${id}`)); alert("✅ 已刪除");
         }
 
-        // ---------- 兌換記錄 ----------
+        // ---------- 渲染兌換記錄 ----------
         function renderRedeemRequests() {
             const c = document.getElementById("redeemRequestsList");
             const allIds = Object.keys(redeemRequests);
@@ -591,7 +534,7 @@
                 cb.addEventListener("change", async (e) => {
                     const id = e.target.dataset.id;
                     const checked = e.target.checked;
-                    try { await update(ref(db, `redeemRequests/${id}`), { prizeDelivered: checked }); } catch(err) { alert("更新失敗：" + err.message); e.target.checked = !checked; }
+                    await update(ref(db, `redeemRequests/${id}`), { prizeDelivered: checked }).catch(err => alert("更新失敗：" + err.message));
                 });
             });
             c.querySelectorAll(".approve-redeem").forEach(b => b.addEventListener("click", e => approveRedeem(e.target.dataset.id)));
@@ -605,28 +548,14 @@
             if (!w || (w.points||0) < r.cost) { alert("❌ 點數不足"); return; }
             const iSnap = await get(ref(db, `shopItems/${r.itemId}`)); const item = iSnap.val();
             if (!item || item.stock<=0) { alert("❌ 庫存不足"); return; }
-            await runTransaction(ref(db, `pointUsers/${r.playerName}`), cur => {
-                if (!cur || (cur.points||0) < r.cost) return;
-                cur.points -= r.cost;
-                if (!cur.transactions) cur.transactions = {};
-                cur.transactions[Date.now()] = { amount: -r.cost, timestamp:Date.now(), type:"redeem" };
-                return cur;
-            });
+            await runTransaction(ref(db, `pointUsers/${r.playerName}`), cur => { if (!cur || cur.points < r.cost) return; cur.points -= r.cost; return cur; });
             await runTransaction(ref(db, `shopItems/${r.itemId}/stock`), cur => (cur===null||cur<=0) ? undefined : cur-1);
             await update(ref(db, `redeemRequests/${id}`), { status:"approved", processedAt:Date.now() }); alert("✅ 兌換成功");
         }
+        async function rejectRedeem(id) { if (!confirm("拒絕兌換？")) return; await update(ref(db, `redeemRequests/${id}`), { status:"rejected", processedAt:Date.now() }); alert("已拒絕"); }
+        async function deleteRedeemRecord(id) { if (!confirm("刪除這筆兌換記錄？")) return; await remove(ref(db, `redeemRequests/${id}`)); alert("✅ 已刪除"); }
 
-        async function rejectRedeem(id) {
-            if (!confirm("拒絕兌換？")) return;
-            await update(ref(db, `redeemRequests/${id}`), { status:"rejected", processedAt:Date.now() }); alert("已拒絕");
-        }
-
-        async function deleteRedeemRecord(id) {
-            if (!confirm("確定要刪除這筆兌換記錄嗎？此操作無法復原。")) return;
-            try { await remove(ref(db, `redeemRequests/${id}`)); alert("✅ 兌換記錄已刪除"); } catch(e) { alert("❌ 刪除失敗：" + e.message); }
-        }
-
-        // ---------- 獎品管理 ----------
+        // ---------- 渲染扭蛋獎品管理 ----------
         function buildPrizeCardHtml(id) {
             const p = currentPrizes[id]; const codesObj = currentPrizeCodes[id];
             const ticketCodesText = codesObj ? Object.keys(codesObj).sort((a,b)=>Number(a)-Number(b)).map(k=>codesObj[k]).join("\n") : "";
@@ -691,10 +620,208 @@
             if (!newId || currentPrizes[newId]) { alert("❌ 代號已存在"); return; }
             update(ref(db, "prizes/"+newId), { name:"新獎品", image:"", quantity:1, totalQuantity:1, weight:1, groups:[], minPoints:null, maxPoints:null });
         }
-
         function deletePrize(id) {
             if (!confirm(`刪除「${currentPrizes[id]?.name||id}」？`)) return;
             Promise.all([remove(ref(db, "prizes/"+id)), remove(ref(db, "prizeCodes/"+id))]).catch(e=>alert("❌ "+e.message));
+        }
+
+        // ---------- 渲染拉霸機符號管理 ----------
+        function renderSlotSymbolList() {
+            const container = document.getElementById("slotSymbolList");
+            const ids = Object.keys(slotSymbols);
+            if (!ids.length) { container.innerHTML = '<p class="text-gray-400 text-sm">尚無符號</p>'; return; }
+            container.innerHTML = ids.map(id => {
+                const s = slotSymbols[id];
+                return `<div class="slot-symbol-card">
+                    <img src="${s.image || ''}" style="width:50px;height:50px;object-fit:contain;background:#f9fafb;border-radius:8px;">
+                    <div class="flex-grow">
+                        <div class="font-bold text-sm">${escapeHtml(s.name || id)}</div>
+                        <div class="text-xs text-gray-500">${escapeHtml(s.emoji || '')}</div>
+                    </div>
+                    <button class="delete-slot-symbol bg-rose-100 text-rose-600 text-xs font-bold px-3 py-1 rounded-lg" data-id="${id}">刪除</button>
+                </div>`;
+            }).join("");
+            container.querySelectorAll(".delete-slot-symbol").forEach(btn => btn.addEventListener("click", e => deleteSlotSymbol(e.target.dataset.id)));
+        }
+
+        async function deleteSlotSymbol(id) {
+            if (!confirm(`刪除符號「${slotSymbols[id]?.name || id}」？`)) return;
+            await remove(ref(db, `slotSymbols/${id}`));
+            alert("✅ 已刪除");
+        }
+
+        document.getElementById("addSlotSymbolBtn").addEventListener("click", () => {
+            const id = prompt("符號代號（例如 A）").trim();
+            if (!id || slotSymbols[id]) { alert("代號已存在或無效"); return; }
+            const name = prompt("符號名稱（例如 星星）").trim() || id;
+            const emoji = prompt("Emoji（可留空）") || "";
+            const image = prompt("圖片網址（可留空）") || "";
+            set(ref(db, `slotSymbols/${id}`), { name, emoji, image });
+        });
+
+        // ---------- 渲染拉霸機獎品管理 ----------
+        function renderSlotPrizeList() {
+            const container = document.getElementById("slotPrizeList");
+            const ids = Object.keys(slotPrizes);
+            if (!ids.length) { container.innerHTML = '<p class="text-gray-400 text-sm">尚無獎品</p>'; return; }
+            container.innerHTML = ids.map(id => {
+                const p = slotPrizes[id];
+                return `<div class="slot-prize-card">
+                    <div class="flex-grow">
+                        <div class="font-bold text-sm">${escapeHtml(p.name || id)}</div>
+                        <div class="text-xs text-gray-500">對應符號：${escapeHtml(id)} | 庫存：${p.quantity || 0}</div>
+                        <div class="text-xs text-gray-500">獎品內容：${escapeHtml(p.code || '')}</div>
+                    </div>
+                    <button class="delete-slot-prize bg-rose-100 text-rose-600 text-xs font-bold px-3 py-1 rounded-lg" data-id="${id}">刪除</button>
+                </div>`;
+            }).join("");
+            container.querySelectorAll(".delete-slot-prize").forEach(btn => btn.addEventListener("click", e => deleteSlotPrize(e.target.dataset.id)));
+        }
+
+        async function deleteSlotPrize(id) {
+            if (!confirm(`刪除獎品「${slotPrizes[id]?.name || id}」？`)) return;
+            await remove(ref(db, `slotPrizes/${id}`));
+            alert("✅ 已刪除");
+        }
+
+        document.getElementById("addSlotPrizeBtn").addEventListener("click", () => {
+            const id = prompt("對應符號代號（例如 A）").trim();
+            if (!id || !slotSymbols[id]) { alert("該符號不存在，請先新增符號"); return; }
+            if (slotPrizes[id]) { alert("該符號已設定獎品"); return; }
+            const name = prompt("獎品名稱（例如 星巴克飲料券）").trim() || id;
+            const quantity = parseInt(prompt("獎品庫存數量")) || 1;
+            const code = prompt("獎品連結或內容（可留空）") || "";
+            set(ref(db, `slotPrizes/${id}`), { name, quantity, code });
+        });
+
+        // ---------- 渲染抽獎紀錄（合併扭蛋與拉霸） ----------
+        function renderWinnerTable() {
+            const tbody = document.getElementById("winnerTableBody");
+            const empty = document.getElementById("winnerEmptyState");
+            const allRows = [];
+            const seen = new Set();
+
+            // 扭蛋紀錄
+            for (const name in drawRecords) {
+                const records = drawRecords[name];
+                if (records && typeof records === 'object') {
+                    for (const key in records) {
+                        const rec = records[key];
+                        if (rec && rec.time) {
+                            const uniqueKey = `gacha_${name}_${rec.time}`;
+                            if (!seen.has(uniqueKey)) {
+                                seen.add(uniqueKey);
+                                allRows.push({
+                                    user: name,
+                                    type: '扭蛋',
+                                    content: rec.won || '',
+                                    code: rec.code || '',
+                                    time: rec.time,
+                                    source: 'drawRecords',
+                                    recordKey: key,
+                                    playerName: name
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 拉霸紀錄
+            for (const name in slotRecords) {
+                const records = slotRecords[name];
+                if (records && typeof records === 'object') {
+                    for (const key in records) {
+                        const rec = records[key];
+                        if (rec && rec.time) {
+                            const uniqueKey = `slot_${name}_${rec.time}`;
+                            if (!seen.has(uniqueKey)) {
+                                seen.add(uniqueKey);
+                                allRows.push({
+                                    user: name,
+                                    type: '拉霸',
+                                    content: rec.prizeName || rec.symbol || '',
+                                    code: rec.code || '',
+                                    time: rec.time,
+                                    source: 'slotRecords',
+                                    recordKey: key,
+                                    playerName: name
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 舊的 playedUsers 紀錄（若無 drawRecords）
+            for (const name in currentPlayedUsers) {
+                const u = currentPlayedUsers[name];
+                if (!u || !u.time) continue;
+                const hasDrawRecord = drawRecords[name] && Object.keys(drawRecords[name]).length > 0;
+                if (!hasDrawRecord) {
+                    const uniqueKey = `gacha_${name}_${u.time}`;
+                    if (!seen.has(uniqueKey)) {
+                        seen.add(uniqueKey);
+                        allRows.push({
+                            user: name,
+                            type: '扭蛋',
+                            content: u.won || '',
+                            code: u.code || '',
+                            time: u.time,
+                            source: 'playedUsers',
+                            recordKey: null,
+                            playerName: name
+                        });
+                    }
+                }
+            }
+
+            allRows.sort((a, b) => (b.time || 0) - (a.time || 0));
+            document.getElementById("winnerCount").innerText = allRows.length;
+
+            if (!allRows.length) {
+                tbody.innerHTML = "";
+                empty.classList.remove("hidden");
+                return;
+            }
+            empty.classList.add("hidden");
+
+            tbody.innerHTML = allRows.map((r, idx) => {
+                const timeStr = r.time ? new Date(r.time).toLocaleString("zh-TW") : "-";
+                const typeBadge = r.type === '扭蛋' ? 'bg-pink-100 text-pink-700' : 'bg-purple-100 text-purple-700';
+                const deleteBtn = r.source === 'playedUsers'
+                    ? `<button class="delete-winner text-rose-400 text-xs font-bold" data-source="playedUsers" data-player="${escapeAttr(r.playerName)}">刪除玩家全部紀錄</button>`
+                    : `<button class="delete-winner text-rose-400 text-xs font-bold" data-source="${r.source}" data-player="${escapeAttr(r.playerName)}" data-key="${escapeAttr(r.recordKey)}">刪除此筆</button>`;
+                return `<tr class="border-b">
+                    <td class="py-2 font-bold">${escapeHtml(r.user)}</td>
+                    <td><span class="text-xs font-bold px-2 py-1 rounded-full ${typeBadge}">${r.type}</span></td>
+                    <td class="font-bold">${escapeHtml(r.content || "-")}</td>
+                    <td class="break-all">${escapeHtml(r.code || "-")}</td>
+                    <td class="text-xs">${timeStr}</td>
+                    <td>${deleteBtn}</td>
+                </tr>`;
+            }).join("");
+
+            tbody.querySelectorAll(".delete-winner").forEach(btn => {
+                btn.addEventListener("click", async (e) => {
+                    const source = e.target.dataset.source;
+                    const player = e.target.dataset.player;
+                    const key = e.target.dataset.key;
+                    if (source === 'drawRecords' && key) {
+                        if (!confirm(`刪除「${player}」的這筆扭蛋紀錄？`)) return;
+                        await remove(ref(db, `drawRecords/${player}/${key}`));
+                        alert("✅ 已刪除此筆紀錄");
+                    } else if (source === 'slotRecords' && key) {
+                        if (!confirm(`刪除「${player}」的這筆拉霸紀錄？`)) return;
+                        await remove(ref(db, `slotRecords/${player}/${key}`));
+                        alert("✅ 已刪除此筆紀錄");
+                    } else if (source === 'playedUsers') {
+                        if (!confirm(`刪除「${player}」的所有抽獎紀錄？此操作會連同抽獎次數一起清除！`)) return;
+                        await remove(ref(db, `playedUsers/${player}`));
+                        alert("✅ 已刪除該玩家所有紀錄");
+                    }
+                });
+            });
         }
 
         // ---------- 錢包管理 ----------
@@ -850,38 +977,55 @@
         // ---------- 匯出 CSV ----------
         function exportWinnersCSV() {
             const rows = [];
+            const seen = new Set();
+
             for (const name in drawRecords) {
                 const records = drawRecords[name];
                 if (records && typeof records === 'object') {
                     for (const key in records) {
                         const rec = records[key];
-                        rows.push({
-                            user: name,
-                            group: rec.group || "",
-                            won: rec.won || "",
-                            code: rec.code || "",
-                            time: rec.time ? new Date(rec.time).toLocaleString("zh-TW") : ""
-                        });
+                        const uniqueKey = `gacha_${name}_${rec.time}`;
+                        if (!seen.has(uniqueKey)) {
+                            seen.add(uniqueKey);
+                            rows.push({ user: name, type: '扭蛋', content: rec.won || '', code: rec.code || '', time: rec.time });
+                        }
                     }
                 }
             }
-            // 若 drawRecords 為空，則從 playedUsers 獲取
-            if (!rows.length) {
-                for (const name in currentPlayedUsers) {
-                    const u = currentPlayedUsers[name];
-                    rows.push({
-                        user: name,
-                        group: u.group || "",
-                        won: u.won || "",
-                        code: u.code || "",
-                        time: u.time ? new Date(u.time).toLocaleString("zh-TW") : ""
-                    });
+
+            for (const name in slotRecords) {
+                const records = slotRecords[name];
+                if (records && typeof records === 'object') {
+                    for (const key in records) {
+                        const rec = records[key];
+                        const uniqueKey = `slot_${name}_${rec.time}`;
+                        if (!seen.has(uniqueKey)) {
+                            seen.add(uniqueKey);
+                            rows.push({ user: name, type: '拉霸', content: rec.prizeName || rec.symbol || '', code: rec.code || '', time: rec.time });
+                        }
+                    }
                 }
             }
+
+            for (const name in currentPlayedUsers) {
+                const u = currentPlayedUsers[name];
+                if (!u || !u.time) continue;
+                const hasDrawRecord = drawRecords[name] && Object.keys(drawRecords[name]).length > 0;
+                if (!hasDrawRecord) {
+                    const uniqueKey = `gacha_${name}_${u.time}`;
+                    if (!seen.has(uniqueKey)) {
+                        seen.add(uniqueKey);
+                        rows.push({ user: name, type: '扭蛋', content: u.won || '', code: u.code || '', time: u.time });
+                    }
+                }
+            }
+
+            rows.sort((a, b) => (b.time || 0) - (a.time || 0));
             if (!rows.length) { alert("無資料"); return; }
-            const lines = [["姓名","群組","中獎項目","序號/連結","時間"].join(",")];
+            const lines = [["姓名","類型","內容","序號/連結","時間"].join(",")];
             rows.forEach(r => {
-                lines.push([r.user, r.group, r.won, r.code, r.time].map(csvEscape).join(","));
+                const timeStr = r.time ? new Date(r.time).toLocaleString("zh-TW") : "";
+                lines.push([r.user, r.type, r.content, r.code, timeStr].map(csvEscape).join(","));
             });
             const blob = new Blob(["\uFEFF"+lines.join("\n")], {type:"text/csv"});
             const a = document.createElement("a");
@@ -894,7 +1038,8 @@
             if (prompt("輸入 RESET 確認") !== "RESET") return;
             await Promise.all([
                 remove(ref(db, "playedUsers")),
-                remove(ref(db, "drawRecords"))
+                remove(ref(db, "drawRecords")),
+                remove(ref(db, "slotRecords"))
             ]);
             alert("✅ 已清空所有抽獎紀錄");
         }
@@ -910,17 +1055,7 @@
             document.getElementById("addShopItemBtn").addEventListener("click", addNewShopItem);
             document.getElementById("exportCSVBtn").addEventListener("click", exportWinnersCSV);
             document.getElementById("resetDrawDataBtn").addEventListener("click", resetDrawData);
-            document.getElementById("saveMaxDrawsBtn").addEventListener("click", saveMaxDraws);
         });
-
-        async function saveMaxDraws() {
-            const val = parseInt(document.getElementById("maxDrawsInput").value);
-            if (!val || val < 1) { alert("請輸入大於 0 的整數"); return; }
-            try {
-                await set(ref(db, "settings/global/maxDrawsPerPlayer"), val);
-                alert("✅ 已儲存");
-            } catch(e) { alert("❌ 儲存失敗：" + e.message); }
-        }
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
@@ -933,5 +1068,4 @@
             }
         });
     </script>
-</body>
-</html>
+
