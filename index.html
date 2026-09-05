@@ -60,10 +60,6 @@
                         <option value="slot">僅拉霸機</option>
                     </select>
                 </div>
-                <div class="setting-card">
-                    <label class="field-label">每位玩家預設可抽次數（扭蛋 + 拉霸共用）</label>
-                    <input type="number" id="maxDrawsInput" class="field-input" min="1" value="1">
-                </div>
             </div>
             <div class="flex gap-2 mt-4">
                 <button id="saveGameSettingsBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2 rounded-xl transition-all">💾 儲存遊戲設定</button>
@@ -188,14 +184,6 @@
                 <div id="winnerEmptyState" class="text-center text-gray-400 text-sm py-8">目前還沒有人抽獎</div>
             </div>
         </section>
-
-        <!-- ⚠️ 危險區域 -->
-        <section class="bg-rose-50 rounded-3xl border border-rose-200 shadow p-5 md:p-6">
-            <h2 class="font-black text-rose-600 mb-2">⚠️ 危險區域</h2>
-            <p class="text-xs text-rose-500 mb-4">以下操作無法復原，請確認活動真的要「重新開始」再執行。</p>
-            <button id="resetDrawDataBtn" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">🗑️ 清空所有抽獎紀錄（不影響獎品設定）</button>
-        </section>
-    </div>
 
     <!-- 🔐 新增 / 編輯錢包彈窗 -->
     <div id="walletModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" style="display: none;">
@@ -349,14 +337,6 @@
                 set(ref(db, "settings/closed"), next).catch(err => alert("❌ 設定失敗：" + err.message));
             });
 
-            // 讀取全域預設
-            onValue(ref(db, "settings/global/maxDrawsPerPlayer"), (snap) => {
-                const val = snap.val();
-                defaultMaxDraws = (val && Number.isInteger(val) && val > 0) ? val : 1;
-                document.getElementById("maxDrawsInput").value = defaultMaxDraws;
-                renderPlayerPermList();
-            });
-
             // 讀取遊戲模式
             onValue(ref(db, "settings/global/gameMode"), (snap) => {
                 const mode = snap.val() || "both";
@@ -402,12 +382,8 @@
         // ---------- 儲存遊戲設定 ----------
         document.getElementById("saveGameSettingsBtn").addEventListener("click", async () => {
             const gameMode = document.getElementById("gameModeSelect").value;
-            const maxDraws = parseInt(document.getElementById("maxDrawsInput").value) || 1;
             try {
-                await Promise.all([
-                    set(ref(db, "settings/global/gameMode"), gameMode),
-                    set(ref(db, "settings/global/maxDrawsPerPlayer"), maxDraws)
-                ]);
+                await set(ref(db, "settings/global/gameMode"), gameMode);
                 alert("✅ 已儲存遊戲設定");
             } catch(e) { alert("❌ 儲存失敗：" + e.message); }
         });
@@ -1137,14 +1113,6 @@
             a.click();
         }
 
-        async function resetDrawData() {
-            if (prompt("輸入 RESET 確認") !== "RESET") return;
-            await Promise.all([
-                remove(ref(db, "playedUsers")),
-                remove(ref(db, "drawRecords"))
-            ]);
-            alert("✅ 已清空所有抽獎紀錄");
-        }
 
         // ---------- 初始事件綁定 ----------
         document.addEventListener("DOMContentLoaded", () => {
@@ -1156,7 +1124,6 @@
             document.getElementById("saveWalletBtn").addEventListener("click", saveWallet);
             document.getElementById("addShopItemBtn").addEventListener("click", addNewShopItem);
             document.getElementById("exportCSVBtn").addEventListener("click", exportWinnersCSV);
-            document.getElementById("resetDrawDataBtn").addEventListener("click", resetDrawData);
         });
 
         onAuthStateChanged(auth, (user) => {
