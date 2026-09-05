@@ -828,7 +828,8 @@
                 if (!id) { alert('有符號未填寫代號'); return; }
                 const name = row.querySelector('.slot-symbol-name').value.trim();
                 const emoji = row.querySelector('.slot-symbol-emoji').value.trim();
-                const weight = parseInt(row.querySelector('.slot-symbol-weight').value) || 10;
+                const weightInput = row.querySelector('.slot-symbol-weight').value;
+                const weight = (weightInput === '' || isNaN(parseInt(weightInput))) ? 10 : parseInt(weightInput);
                 const image = row.querySelector('.slot-symbol-image-url').value.trim();
                 const prizeId = row.querySelector('.slot-symbol-prize').value;
                 data[id] = { name, emoji, weight, image, prizeId };
