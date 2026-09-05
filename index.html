@@ -603,7 +603,6 @@
             const container = document.getElementById("slotSymbolTable");
             const ids = Object.keys(slotSymbols);
             if (!ids.length) { container.innerHTML = '<p class="text-gray-400 text-sm">尚無符號，請點擊「＋ 新增符號列」</p>'; return; }
-            const prizeOptions = Object.keys(currentPrizes).map(pid => `<option value="${escapeAttr(pid)}" ${slotSymbols[ids[0]]?.prizeId === pid ? 'selected' : ''}>${escapeHtml(currentPrizes[pid]?.name || pid)}</option>`).join('');
             container.innerHTML = ids.map(id => {
                 const s = slotSymbols[id] || {};
                 const weight = s.weight || 10;
