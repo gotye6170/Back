@@ -969,101 +969,99 @@
         }
 
         // ---------- 抽獎紀錄（合併扭蛋與拉霸，皆存在 drawRecords） ----------
-        function renderWinnerTable() {
-            const tbody = document.getElementById("winnerTableBody");
-            const empty = document.getElementById("winnerEmptyState");
-            const allRows = [];
-            const seen = new Set();
 
-            for (const name in drawRecords) {
-                const records = drawRecords[name];
-                if (records && typeof records === 'object') {
-                    for (const key in records) {
-                        const rec = records[key];
-                        if (rec && rec.time) {
-                            const uniqueKey = `${name}_${rec.time}`;
-                            if (!seen.has(uniqueKey)) {
-                                seen.add(uniqueKey);
-                                allRows.push({
-                                    user: name,
-                                    type: rec.type === 'slot' ? '拉霸' : '扭蛋',
-                                    content: rec.won || rec.prizeName || '',
-                                    code: rec.code || '',
-                                    time: rec.time,
-                                    source: 'drawRecords',
-                                    recordKey: key,
-                                    playerName: name
-                                });
-                            }
-                        }
-                    }
-                }
-            }
+function renderWinnerTable() {
+    const tbody = document.getElementById("winnerTableBody");
+    const empty = document.getElementById("winnerEmptyState");
+    const allRows = [];
+    const seenKeys = new Set();
 
-            for (const name in currentPlayedUsers) {
-                const u = currentPlayedUsers[name];
-                if (!u || !u.time) continue;
-                const hasDrawRecord = drawRecords[name] && Object.keys(drawRecords[name]).length > 0;
-                if (!hasDrawRecord) {
-                    const uniqueKey = `${name}_${u.time}`;
-                    if (!seen.has(uniqueKey)) {
-                        seen.add(uniqueKey);
-                        allRows.push({
-                            user: name,
-                            type: '扭蛋',
-                            content: u.won || '',
-                            code: u.code || '',
-                            time: u.time,
-                            source: 'playedUsers',
-                            recordKey: null,
-                            playerName: name
-                        });
-                    }
-                }
-            }
-
-            allRows.sort((a, b) => (b.time || 0) - (a.time || 0));
-
-            if (!allRows.length) {
-                tbody.innerHTML = "";
-                empty.classList.remove("hidden");
-                return;
-            }
-            empty.classList.add("hidden");
-
-            tbody.innerHTML = allRows.map((r, idx) => {
-                const timeStr = r.time ? new Date(r.time).toLocaleString("zh-TW") : "-";
-                const typeBadge = r.type === '扭蛋' ? 'bg-pink-100 text-pink-700' : 'bg-purple-100 text-purple-700';
-                const deleteBtn = r.source === 'playedUsers'
-                    ? `<button class="delete-winner text-rose-400 text-xs font-bold" data-source="playedUsers" data-player="${escapeAttr(r.playerName)}">刪除玩家全部紀錄</button>`
-                    : `<button class="delete-winner text-rose-400 text-xs font-bold" data-source="drawRecords" data-player="${escapeAttr(r.playerName)}" data-key="${escapeAttr(r.recordKey)}">刪除此筆</button>`;
-                return `<tr class="border-b">
-                    <td class="py-2 font-bold">${escapeHtml(r.user)}</td>
-                    <td><span class="text-xs font-bold px-2 py-1 rounded-full ${typeBadge}">${r.type}</span></td>
-                    <td class="font-bold">${escapeHtml(r.content || "-")}</td>
-                    <td class="break-all">${escapeHtml(r.code || "-")}</td>
-                    <td class="text-xs">${timeStr}</td>
-                    <td>${deleteBtn}</td>
-                </tr>`;
-            }).join("");
-
-            tbody.querySelectorAll(".delete-winner").forEach(btn => {
-                btn.addEventListener("click", async (e) => {
-                    const source = e.target.dataset.source;
-                    const player = e.target.dataset.player;
-                    const key = e.target.dataset.key;
-                    if (source === 'drawRecords' && key) {
-                        if (!confirm(`刪除「${player}」的這筆紀錄？`)) return;
-                        await remove(ref(db, `drawRecords/${player}/${key}`));
-                        alert("✅ 已刪除此筆紀錄");
-                    } else if (source === 'playedUsers') {
-                        if (!confirm(`刪除「${player}」的所有抽獎紀錄？此操作會連同抽獎次數一起清除！`)) return;
-                        await remove(ref(db, `playedUsers/${player}`));
-                        alert("✅ 已刪除該玩家所有紀錄");
-                    }
-                });
+    // 1. 先處理 drawRecords 中的所有紀錄
+    for (const name in drawRecords) {
+        const records = drawRecords[name];
+        if (!records || typeof records !== 'object') continue;
+        for (const key in records) {
+            const rec = records[key];
+            if (!rec || !rec.time) continue;
+            const uniqueKey = `${name}_${rec.time}_${rec.won || rec.prizeName || ''}`;
+            if (seenKeys.has(uniqueKey)) continue;
+            seenKeys.add(uniqueKey);
+            allRows.push({
+                user: name,
+                type: rec.type === 'slot' ? '拉霸' : '扭蛋',
+                content: rec.won || rec.prizeName || '',
+                code: rec.code || '',
+                time: rec.time,
+                source: 'drawRecords',
+                recordKey: key,
+                playerName: name
             });
         }
+    }
+
+    // 2. 再處理 playedUsers 中未被 drawRecords 覆蓋的紀錄（舊版資料）
+    for (const name in currentPlayedUsers) {
+        const u = currentPlayedUsers[name];
+        if (!u || !u.time || !u.won) continue;
+        const uniqueKey = `${name}_${u.time}_${u.won}`;
+        if (seenKeys.has(uniqueKey)) continue;
+        seenKeys.add(uniqueKey);
+        allRows.push({
+            user: name,
+            type: '扭蛋',
+            content: u.won,
+            code: u.code || '',
+            time: u.time,
+            source: 'playedUsers',
+            recordKey: null,
+            playerName: name
+        });
+    }
+
+    // 排序（新的在前）
+    allRows.sort((a, b) => (b.time || 0) - (a.time || 0));
+
+    if (!allRows.length) {
+        tbody.innerHTML = "";
+        empty.classList.remove("hidden");
+        return;
+    }
+    empty.classList.add("hidden");
+
+    tbody.innerHTML = allRows.map((r) => {
+        const timeStr = r.time ? new Date(r.time).toLocaleString("zh-TW") : "-";
+        const typeBadge = r.type === '扭蛋' ? 'bg-pink-100 text-pink-700' : 'bg-purple-100 text-purple-700';
+        const deleteBtn = r.source === 'playedUsers'
+            ? `<button class="delete-winner text-rose-400 text-xs font-bold" data-source="playedUsers" data-player="${escapeAttr(r.playerName)}">刪除玩家全部紀錄</button>`
+            : `<button class="delete-winner text-rose-400 text-xs font-bold" data-source="drawRecords" data-player="${escapeAttr(r.playerName)}" data-key="${escapeAttr(r.recordKey)}">刪除此筆</button>`;
+        return `<tr class="border-b">
+            <td class="py-2 font-bold">${escapeHtml(r.user)}</td>
+            <td><span class="text-xs font-bold px-2 py-1 rounded-full ${typeBadge}">${r.type}</span></td>
+            <td class="font-bold">${escapeHtml(r.content || "-")}</td>
+            <td class="break-all">${escapeHtml(r.code || "-")}</td>
+            <td class="text-xs">${timeStr}</td>
+            <td>${deleteBtn}</td>
+        </tr>`;
+    }).join("");
+
+    // 綁定刪除事件
+    tbody.querySelectorAll(".delete-winner").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+            const source = e.target.dataset.source;
+            const player = e.target.dataset.player;
+            const key = e.target.dataset.key;
+            if (source === 'drawRecords' && key) {
+                if (!confirm(`刪除「${player}」的這筆紀錄？`)) return;
+                await remove(ref(db, `drawRecords/${player}/${key}`));
+                alert("✅ 已刪除此筆紀錄");
+            } else if (source === 'playedUsers') {
+                if (!confirm(`刪除「${player}」的所有抽獎紀錄？此操作會連同抽獎次數一起清除！`)) return;
+                await remove(ref(db, `playedUsers/${player}`));
+                alert("✅ 已刪除該玩家所有紀錄");
+            }
+        });
+    });
+}
 
         function exportWinnersCSV() {
             const rows = [];
