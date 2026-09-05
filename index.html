@@ -677,7 +677,7 @@
             if (!ids.length) { container.innerHTML = '<p class="text-gray-400 text-sm">尚無符號，請點擊「＋ 新增符號列」</p>'; return; }
             container.innerHTML = ids.map(id => {
                 const s = slotSymbols[id] || {};
-                const weight = s.weight || 10;
+                const weight = (s.weight === undefined || s.weight === null || isNaN(s.weight)) ? 10 : s.weight;
                 const imageUrl = s.image || "";
                 const prizeId = s.prizeId || "";
                 const prizeOptionsForRow = Object.keys(currentPrizes).map(pid => `<option value="${escapeAttr(pid)}" ${prizeId === pid ? 'selected' : ''}>${escapeHtml(currentPrizes[pid]?.name || pid)}</option>`).join('');
