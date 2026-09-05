@@ -71,6 +71,41 @@
             <p class="text-xs text-gray-500 mt-2">遊戲模式變更後，玩家端的選項會立即更新。抽獎次數為扭蛋與拉霸共用。</p>
         </section>
 
+        <!-- 🔊 音效設定 -->
+        <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
+            <h2 class="font-black text-slate-700 mb-4">🔊 音效設定</h2>
+            <p class="text-xs text-gray-500 mb-3">上傳 mp3 音效檔，玩家端將播放這些音效。留空則使用預設合成音效。</p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="setting-card">
+                    <label class="field-label">扭蛋轉動音效</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="soundCrankUrl" class="field-input" placeholder="音效網址">
+                        <button id="uploadCrankSoundBtn" class="bg-cyan-100 text-cyan-700 text-xs font-bold px-3 rounded-lg">📤 上傳</button>
+                        <input type="file" accept="audio/*" id="crankSoundFileInput" style="display:none">
+                    </div>
+                </div>
+                <div class="setting-card">
+                    <label class="field-label">中獎音效</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="soundWinUrl" class="field-input" placeholder="音效網址">
+                        <button id="uploadWinSoundBtn" class="bg-cyan-100 text-cyan-700 text-xs font-bold px-3 rounded-lg">📤 上傳</button>
+                        <input type="file" accept="audio/*" id="winSoundFileInput" style="display:none">
+                    </div>
+                </div>
+                <div class="setting-card">
+                    <label class="field-label">拉霸轉動音效</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="soundSlotUrl" class="field-input" placeholder="音效網址">
+                        <button id="uploadSlotSoundBtn" class="bg-cyan-100 text-cyan-700 text-xs font-bold px-3 rounded-lg">📤 上傳</button>
+                        <input type="file" accept="audio/*" id="slotSoundFileInput" style="display:none">
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-2 mt-4">
+                <button id="saveSoundsBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2 rounded-xl transition-all">💾 儲存音效設定</button>
+            </div>
+        </section>
+
         <!-- 📊 點數記錄 -->
         <section class="bg-amber-50/70 rounded-3xl border border-amber-200 shadow p-5 md:p-6">
             <h2 class="font-black text-amber-700 mb-4">📊 點數記錄</h2>
@@ -328,6 +363,14 @@
                 document.getElementById("gameModeSelect").value = mode;
             });
 
+            // 讀取音效設定
+            onValue(ref(db, "settings/sounds"), (snap) => {
+                const data = snap.val() || {};
+                document.getElementById("soundCrankUrl").value = data.crank || "";
+                document.getElementById("soundWinUrl").value = data.win || "";
+                document.getElementById("soundSlotUrl").value = data.slot || "";
+            });
+
             // 讀取個別抽獎次數限制
             onValue(ref(db, "drawLimits"), (snap) => {
                 drawLimits = snap.val() || {};
@@ -367,6 +410,59 @@
                 ]);
                 alert("✅ 已儲存遊戲設定");
             } catch(e) { alert("❌ 儲存失敗：" + e.message); }
+        });
+
+        // ---------- 音效上傳與儲存 ----------
+        async function uploadSoundFile(inputElement, urlInputElement) {
+            const file = inputElement.files?.[0];
+            if (!file) return;
+            if (!file.type.startsWith('audio/')) { alert('請上傳音效檔案'); return; }
+            urlInputElement.value = "⏳ 上傳中…";
+            urlInputElement.disabled = true;
+            try {
+                const url = await uploadFileToCloudinary(file);
+                urlInputElement.value = url;
+            } catch (e) {
+                alert("❌ 上傳失敗：" + e.message);
+            } finally {
+                urlInputElement.disabled = false;
+                inputElement.value = "";
+            }
+        }
+
+        document.getElementById("uploadCrankSoundBtn").addEventListener("click", () => {
+            document.getElementById("crankSoundFileInput").click();
+        });
+        document.getElementById("crankSoundFileInput").addEventListener("change", (e) => {
+            uploadSoundFile(e.target, document.getElementById("soundCrankUrl"));
+        });
+
+        document.getElementById("uploadWinSoundBtn").addEventListener("click", () => {
+            document.getElementById("winSoundFileInput").click();
+        });
+        document.getElementById("winSoundFileInput").addEventListener("change", (e) => {
+            uploadSoundFile(e.target, document.getElementById("soundWinUrl"));
+        });
+
+        document.getElementById("uploadSlotSoundBtn").addEventListener("click", () => {
+            document.getElementById("slotSoundFileInput").click();
+        });
+        document.getElementById("slotSoundFileInput").addEventListener("change", (e) => {
+            uploadSoundFile(e.target, document.getElementById("soundSlotUrl"));
+        });
+
+        document.getElementById("saveSoundsBtn").addEventListener("click", async () => {
+            const data = {
+                crank: document.getElementById("soundCrankUrl").value.trim(),
+                win: document.getElementById("soundWinUrl").value.trim(),
+                slot: document.getElementById("soundSlotUrl").value.trim()
+            };
+            try {
+                await set(ref(db, "settings/sounds"), data);
+                alert("✅ 音效設定已儲存");
+            } catch (e) {
+                alert("❌ 儲存失敗：" + e.message);
+            }
         });
 
         // ---------- 渲染玩家抽獎權限與次數設定 ----------
@@ -598,7 +694,7 @@
             Promise.all([remove(ref(db, "prizes/"+id)), remove(ref(db, "prizeCodes/"+id))]).catch(e=>alert("❌ "+e.message));
         }
 
-        // ---------- 拉霸機符號管理（新增獎品選擇下拉） ----------
+        // ---------- 拉霸機符號管理（含獎品選擇下拉） ----------
         function renderSlotSymbolTable() {
             const container = document.getElementById("slotSymbolTable");
             const ids = Object.keys(slotSymbols);
@@ -607,7 +703,7 @@
                 const s = slotSymbols[id] || {};
                 const weight = s.weight || 10;
                 const imageUrl = s.image || "";
-                const prizeId = s.prizeId || ""; // 若無則為空，代表使用符號代號
+                const prizeId = s.prizeId || "";
                 const prizeOptionsForRow = Object.keys(currentPrizes).map(pid => `<option value="${escapeAttr(pid)}" ${prizeId === pid ? 'selected' : ''}>${escapeHtml(currentPrizes[pid]?.name || pid)}</option>`).join('');
                 return `
                 <div class="slot-symbol-row" data-symbol-id="${escapeAttr(id)}">
@@ -632,7 +728,6 @@
                 </div>`;
             }).join("");
 
-            // 綁定上傳按鈕
             container.querySelectorAll('.slot-symbol-upload-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const row = e.target.closest('.slot-symbol-row');
@@ -640,7 +735,6 @@
                 });
             });
 
-            // 綁定檔案上傳
             container.querySelectorAll('.slot-symbol-image-file').forEach(input => {
                 input.addEventListener('change', async (e) => {
                     const file = e.target.files[0];
@@ -662,7 +756,6 @@
                 });
             });
 
-            // 綁定刪除按鈕（僅移除畫面，儲存時才真正更新）
             container.querySelectorAll('.slot-symbol-delete-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     if (!confirm('刪除此符號？')) return;
@@ -671,7 +764,6 @@
             });
         }
 
-        // 新增符號列
         document.getElementById("addSlotSymbolRowBtn").addEventListener("click", () => {
             const container = document.getElementById("slotSymbolTable");
             const row = document.createElement('div');
@@ -698,7 +790,6 @@
                 </div>`;
             container.appendChild(row);
 
-            // 綁定上傳
             const uploadBtn = row.querySelector('.slot-symbol-upload-btn');
             uploadBtn.addEventListener('click', (e) => {
                 const fileInput = e.target.closest('.slot-symbol-row').querySelector('.slot-symbol-image-file');
@@ -722,7 +813,6 @@
                     e.target.value = "";
                 }
             });
-            // 綁定刪除
             const deleteBtn = row.querySelector('.slot-symbol-delete-btn');
             deleteBtn.addEventListener('click', (e) => {
                 if (!confirm('刪除此符號？')) return;
@@ -730,7 +820,6 @@
             });
         });
 
-        // 儲存所有符號（包含 prizeId）
         document.getElementById("saveAllSlotSymbolsBtn").addEventListener("click", async () => {
             const rows = document.querySelectorAll('.slot-symbol-row');
             const data = {};
@@ -934,7 +1023,6 @@
                 }
             }
 
-            // 若無 drawRecords，從 playedUsers 兜底（舊資料）
             for (const name in currentPlayedUsers) {
                 const u = currentPlayedUsers[name];
                 if (!u || !u.time) continue;
@@ -1082,4 +1170,4 @@
         });
     </script>
 </body>
-</html>
+</html> 
