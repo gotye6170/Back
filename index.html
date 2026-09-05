@@ -976,7 +976,7 @@ function renderWinnerTable() {
     const allRows = [];
     const seenKeys = new Set();
 
-    // 1. 先處理 drawRecords 中的所有紀錄
+    // 先處理 drawRecords 中的所有紀錄
     for (const name in drawRecords) {
         const records = drawRecords[name];
         if (!records || typeof records !== 'object') continue;
@@ -999,10 +999,19 @@ function renderWinnerTable() {
         }
     }
 
-    // 2. 再處理 playedUsers 中未被 drawRecords 覆蓋的紀錄（舊版資料）
+    // 再處理 playedUsers 中未被 drawRecords 覆蓋的紀錄（舊版資料）
     for (const name in currentPlayedUsers) {
         const u = currentPlayedUsers[name];
         if (!u || !u.time || !u.won) continue;
+        // 檢查是否與 drawRecords 中任何一筆時間相近（<= 5 秒）且獎品相同
+        let isDuplicate = false;
+        for (const row of allRows) {
+            if (row.user === name && row.content === u.won && Math.abs(row.time - u.time) <= 5000) {
+                isDuplicate = true;
+                break;
+            }
+        }
+        if (isDuplicate) continue;
         const uniqueKey = `${name}_${u.time}_${u.won}`;
         if (seenKeys.has(uniqueKey)) continue;
         seenKeys.add(uniqueKey);
@@ -1044,7 +1053,6 @@ function renderWinnerTable() {
         </tr>`;
     }).join("");
 
-    // 綁定刪除事件
     tbody.querySelectorAll(".delete-winner").forEach(btn => {
         btn.addEventListener("click", async (e) => {
             const source = e.target.dataset.source;
