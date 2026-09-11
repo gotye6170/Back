@@ -867,17 +867,28 @@
             c.querySelectorAll(".delete-wallet").forEach(b => b.addEventListener("click", e => deleteWallet(e.target.dataset.name)));
         }
 
-        function editWallet(name) {
-            const data = currentPointUsers[name]; if (!data) return;
-            document.getElementById("walletModalTitle").innerText = "編輯玩家錢包";
-            document.getElementById("walletEditName").value = name;
-            document.getElementById("walletPlayerName").value = name; document.getElementById("walletPlayerName").disabled = true;
-            document.getElementById("walletPoints").value = data.points||0;
-            document.getElementById("walletExpiry").value = data.expiry ? new Date(data.expiry).toISOString().slice(0,10) : "";
-            document.getElementById("walletPass").value = "";
-            document.getElementById("walletBoundUid").value = data.boundUid||"";
-            document.getElementById("walletModal").style.display = "flex";
-        }
+function editWallet(name) {
+    const data = currentPointUsers[name];
+    if (!data) { alert("找不到該玩家錢包資料"); return; }
+    document.getElementById("walletModalTitle").innerText = "編輯玩家錢包";
+    document.getElementById("walletEditName").value = name;
+    const nameInput = document.getElementById("walletPlayerName");
+    nameInput.value = name;
+    nameInput.disabled = true;
+    document.getElementById("walletPoints").value = data.points || 0;
+    if (data.expiry && data.expiry !== 0) {
+        const d = new Date(data.expiry);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        document.getElementById("walletExpiry").value = `${yyyy}-${mm}-${dd}`;
+    } else {
+        document.getElementById("walletExpiry").value = "";
+    }
+    document.getElementById("walletPass").value = "";
+    document.getElementById("walletBoundUid").value = data.boundUid || "";
+    document.getElementById("walletModal").style.display = "flex";
+}
 
         function showAddWalletModal() {
             document.getElementById("walletModalTitle").innerText = "新增玩家錢包";
@@ -891,54 +902,69 @@
 
         function closeWalletModal() { document.getElementById("walletModal").style.display = "none"; }
 
-        async function saveWallet() {
-            const editName = document.getElementById("walletEditName").value.trim();
-            const playerName = document.getElementById("walletPlayerName").value.trim();
-            const newPoints = parseInt(document.getElementById("walletPoints").value) || 0;
-            const expiryStr = document.getElementById("walletExpiry").value;
-            const passRaw = document.getElementById("walletPass").value.trim();
-            const boundUid = document.getElementById("walletBoundUid").value.trim();
+async function saveWallet() {
+    const editName = document.getElementById("walletEditName").value.trim();
+    const playerNameInput = document.getElementById("walletPlayerName");
+    // 編輯時，因為欄位 disabled，直接使用 editName；新增時才用輸入框的值
+    const playerName = editName ? editName : playerNameInput.value.trim();
+    const newPoints = parseInt(document.getElementById("walletPoints").value);
+    const expiryStr = document.getElementById("walletExpiry").value;
+    const passRaw = document.getElementById("walletPass").value.trim();
+    const boundUid = document.getElementById("walletBoundUid").value.trim();
 
-            if (!playerName) { alert("請輸入姓名"); return; }
-            const expiry = expiryStr ? new Date(expiryStr).getTime() : getYearEndTimestamp();
+    if (!playerName) { alert("請輸入姓名"); return; }
+    if (isNaN(newPoints) || newPoints < 0) { alert("點數必須是 0 或正整數"); return; }
 
-            const payload = {
-                points: newPoints,
-                expiry: expiry,
-                boundUid: boundUid || "",
-                personalPassHash: passRaw ? await sha256(passRaw) : (editName ? (currentPointUsers[editName]?.personalPassHash || "") : "")
-            };
+    const expiry = expiryStr ? new Date(expiryStr).getTime() : getYearEndTimestamp();
 
-            let oldPoints = null;
-            if (editName) oldPoints = currentPointUsers[editName]?.points || 0;
-            else if (currentPointUsers[playerName]) oldPoints = currentPointUsers[playerName]?.points || 0;
+    // 取得舊資料
+    const oldData = currentPointUsers[playerName] || {};
+    const oldPoints = oldData.points || 0;
 
-            try {
-                const target = editName || playerName;
-                if (editName && editName !== playerName) {
-                    await remove(ref(db, `pointUsers/${editName}`));
-                    await set(ref(db, `pointUsers/${playerName}`), payload);
-                } else if (!editName) {
-                    await set(ref(db, `pointUsers/${playerName}`), payload);
-                } else {
-                    await update(ref(db, `pointUsers/${target}`), payload);
-                }
+    // 密碼處理：若有輸入新密碼則雜湊，否則保留舊密碼
+    let newPassHash = oldData.personalPassHash || "";
+    if (passRaw) {
+        newPassHash = await sha256(passRaw);
+    }
 
-                const delta = newPoints - (oldPoints || 0);
-                if (delta !== 0) {
-                    await push(ref(db, "pendingPoints"), {
-                        playerName: playerName,
-                        points: delta,
-                        prizeName: "管理員手動調整",
-                        timestamp: Date.now(),
-                        status: "approved",
-                        processedAt: Date.now()
-                    });
-                }
-                alert("✅ 錢包已儲存");
-                closeWalletModal();
-            } catch (e) { alert("❌ " + e.message); }
+    const payload = {
+        points: newPoints,
+        expiry: expiry,
+        boundUid: boundUid || "",
+        personalPassHash: newPassHash
+    };
+
+    try {
+        if (editName) {
+            // 編輯模式：直接更新該玩家
+            await update(ref(db, `pointUsers/${editName}`), payload);
+        } else {
+            // 新增模式：檢查是否已存在
+            if (currentPointUsers[playerName]) {
+                if (!confirm(`「${playerName}」的錢包已存在，是否覆蓋？`)) return;
+            }
+            await set(ref(db, `pointUsers/${playerName}`), payload);
         }
+
+        // 記錄點數差異
+        const delta = newPoints - oldPoints;
+        if (delta !== 0) {
+            await push(ref(db, "pendingPoints"), {
+                playerName: playerName,
+                points: delta,
+                prizeName: "管理員手動調整",
+                timestamp: Date.now(),
+                status: "approved",
+                processedAt: Date.now()
+            });
+        }
+        alert("✅ 錢包已儲存");
+        closeWalletModal();
+    } catch (e) {
+        console.error(e);
+        alert("❌ 儲存失敗：" + e.message);
+    }
+}
 
         async function deleteWallet(name) {
             if (!confirm(`刪除「${name}」錢包？`)) return;
