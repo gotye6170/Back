@@ -51,7 +51,7 @@
         <!-- ⚙️ 遊戲設定 -->
         <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
             <h2 class="font-black text-slate-700 mb-4">⚙️ 遊戲設定</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="setting-card">
                     <label class="field-label">開放遊戲模式</label>
                     <select id="gameModeSelect" class="field-input">
@@ -62,13 +62,22 @@
                     </select>
                 </div>
                 <div class="setting-card">
-                    <label class="field-label">彈珠台獎項格數（2～9）</label>
-                    <input type="number" id="pachinkoBinsInput" class="field-input" min="2" max="9" value="7">
-                </div>
-                <div class="setting-card">
                     <label class="field-label">每位玩家預設可抽次數（共用）</label>
                     <input type="number" id="maxDrawsInput" class="field-input" min="1" value="1">
                 </div>
+            </div>
+
+            <div class="setting-card mt-4">
+                <label class="field-label mb-2">🎯 彈珠台獎池格子配置</label>
+                <div class="flex items-center gap-3 flex-wrap mb-3">
+                    <label class="text-xs font-bold text-gray-500">格數：</label>
+                    <input type="number" id="pachinkoBinsInput" class="field-input w-20 text-center" min="2" max="12" value="7">
+                    <button id="applyBinCountBtn" type="button" class="bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg">套用格數</button>
+                    <button id="autoFillBinsBtn" type="button" class="bg-purple-500 hover:bg-purple-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">依獎品權重自動填入</button>
+                </div>
+                <p class="text-[11px] text-gray-500 mb-2">每個格子可獨立指定獎品，同一獎品佔越多格，中獎機率越高。</p>
+                <div id="binLayoutEditor" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mb-3"></div>
+                <button id="saveBinLayoutBtn" type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2 rounded-xl">💾 儲存格子配置</button>
             </div>
             <div class="flex gap-2 mt-4">
                 <button id="saveGameSettingsBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2 rounded-xl transition-all">💾 儲存遊戲設定</button>
@@ -476,6 +485,8 @@
             onValue(ref(db, "settings/pachinko"), (snap) => {
                 const data = snap.val() || {};
                 document.getElementById("pachinkoBinsInput").value = data.bins || 7;
+                binLayout = Array.isArray(data.binLayout) ? data.binLayout.slice() : [];
+                renderBinLayoutEditor();
             });
 
             onValue(ref(db, "settings/sounds"), (snap) => {
@@ -501,7 +512,12 @@
                 renderSlotSymbolTable();
             });
 
-            onValue(ref(db, "prizes"), (snapshot) => { currentPrizes = snapshot.val() || {}; renderPrizeList(); renderSlotSymbolTable(); }, (err) => { console.error(err); });
+            onValue(ref(db, "prizes"), (snapshot) => {
+                currentPrizes = snapshot.val() || {};
+                renderPrizeList();
+                renderSlotSymbolTable();
+                renderBinLayoutEditor();
+            }, (err) => { console.error(err); });
             onValue(ref(db, "prizeCodes"), (snapshot) => { currentPrizeCodes = snapshot.val() || {}; renderPrizeList(); });
             onValue(ref(db, "playedUsers"), (snapshot) => { currentPlayedUsers = snapshot.val() || {}; renderWinnerTable(); renderPlayerPermList(); });
             onValue(ref(db, "pointUsers"), (snapshot) => { currentPointUsers = snapshot.val() || {}; renderWalletList(); });
@@ -515,15 +531,101 @@
         document.getElementById("saveGameSettingsBtn").addEventListener("click", async () => {
             const gameMode = document.getElementById("gameModeSelect").value;
             const maxDraws = parseInt(document.getElementById("maxDrawsInput").value) || 1;
-            const pachinkoBins = parseInt(document.getElementById("pachinkoBinsInput").value) || 7;
             try {
                 await Promise.all([
                     set(ref(db, "settings/global/gameMode"), gameMode),
-                    set(ref(db, "settings/global/maxDrawsPerPlayer"), maxDraws),
-                    set(ref(db, "settings/pachinko"), { bins: pachinkoBins })
+                    set(ref(db, "settings/global/maxDrawsPerPlayer"), maxDraws)
                 ]);
                 alert("✅ 已儲存遊戲設定");
             } catch(e) { alert("❌ 儲存失敗：" + e.message); }
+        });
+
+        // ---------- 彈珠台獎池格子配置 ----------
+        let binLayout = [];
+
+        function renderBinLayoutEditor() {
+            const container = document.getElementById("binLayoutEditor");
+            if (!container) return;
+            const countInput = document.getElementById("pachinkoBinsInput");
+            let count = parseInt(countInput.value) || 7;
+            count = Math.max(2, Math.min(12, count));
+            countInput.value = count;
+
+            const newLayout = [];
+            for (let i = 0; i < count; i++) newLayout.push(binLayout[i] || "");
+            binLayout = newLayout;
+
+            const prizeIds = Object.keys(currentPrizes);
+
+            container.innerHTML = binLayout.map((pid, i) => {
+                const options = prizeIds.map(p =>
+                    `<option value="${escapeAttr(p)}" ${pid === p ? 'selected' : ''}>${escapeHtml(currentPrizes[p]?.name || p)}</option>`
+                ).join("");
+                return `<div>
+                    <label class="field-label">第 ${i + 1} 格</label>
+                    <select class="field-input bin-slot-select" data-index="${i}">
+                        <option value="" ${!pid ? 'selected' : ''}>（未指定）</option>
+                        ${options}
+                    </select>
+                </div>`;
+            }).join("");
+
+            container.querySelectorAll('.bin-slot-select').forEach(sel => {
+                sel.addEventListener('change', e => {
+                    const idx = parseInt(e.target.dataset.index);
+                    binLayout[idx] = e.target.value;
+                });
+            });
+        }
+
+        document.getElementById("applyBinCountBtn").addEventListener("click", () => {
+            renderBinLayoutEditor();
+        });
+
+        document.getElementById("autoFillBinsBtn").addEventListener("click", () => {
+            const countInput = document.getElementById("pachinkoBinsInput");
+            let count = parseInt(countInput.value) || 7;
+            count = Math.max(2, Math.min(12, count));
+
+            const prizeIds = Object.keys(currentPrizes);
+            if (!prizeIds.length) { alert("尚無獎品可填入"); return; }
+
+            const weights = prizeIds.map(pid => ({
+                id: pid,
+                w: Math.max(1, Number(currentPrizes[pid]?.weight || 1))
+            }));
+            const totalW = weights.reduce((s, x) => s + x.w, 0);
+
+            const alloc = weights.map(x => {
+                const exact = x.w / totalW * count;
+                const base = Math.floor(exact);
+                return { id: x.id, count: base, frac: exact - base };
+            });
+            const used = alloc.reduce((s, x) => s + x.count, 0);
+            const remaining = count - used;
+
+            const sorted = [...alloc].sort((a, b) => b.frac - a.frac);
+            for (let i = 0; i < remaining; i++) sorted[i].count++;
+
+            const newLayout = [];
+            for (const pid of prizeIds) {
+                const a = alloc.find(x => x.id === pid);
+                for (let i = 0; i < a.count; i++) newLayout.push(pid);
+            }
+
+            binLayout = newLayout;
+            renderBinLayoutEditor();
+        });
+
+        document.getElementById("saveBinLayoutBtn").addEventListener("click", async () => {
+            const count = parseInt(document.getElementById("pachinkoBinsInput").value) || 7;
+            if (binLayout.some(x => !x)) {
+                if (!confirm("有格子未指定獎品，確定要儲存嗎？")) return;
+            }
+            try {
+                await set(ref(db, "settings/pachinko"), { bins: count, binLayout: binLayout });
+                alert("✅ 已儲存格子配置");
+            } catch (e) { alert("❌ 儲存失敗：" + e.message); }
         });
 
         // ---------- 音效上傳與儲存 ----------
