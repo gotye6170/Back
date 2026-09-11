@@ -55,7 +55,7 @@
                 <div class="setting-card">
                     <label class="field-label">開放遊戲模式</label>
                     <select id="gameModeSelect" class="field-input">
-                        <option value="both">扭蛋機 + 拉霸機</option>
+                        <option value="both">扭蛋機 + 拉霸機 + 彈珠台</option>
                         <option value="gacha">僅扭蛋機</option>
                         <option value="slot">僅拉霸機</option>
                     </select>
@@ -64,7 +64,7 @@
             <div class="flex gap-2 mt-4">
                 <button id="saveGameSettingsBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2 rounded-xl transition-all">💾 儲存遊戲設定</button>
             </div>
-            <p class="text-xs text-gray-500 mt-2">遊戲模式變更後，玩家端的選項會立即更新。抽獎次數為扭蛋與拉霸共用。</p>
+            <p class="text-xs text-gray-500 mt-2">遊戲模式變更後，玩家端的選項會立即更新。抽獎次數為各模式共用。</p>
         </section>
 
         <!-- 🔊 音效設定 -->
@@ -164,7 +164,7 @@
         <!-- 👑 抽獎紀錄 -->
         <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
             <div class="flex items-center justify-between mb-4">
-                <h2 class="font-black text-slate-700">👑 抽獎紀錄（扭蛋機 + 拉霸機）</h2>
+                <h2 class="font-black text-slate-700">👑 抽獎紀錄（扭蛋機 + 拉霸機 + 彈珠台）</h2>
                 <button id="exportCSVBtn" class="bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">⬇ 匯出 CSV</button>
             </div>
             <div class="overflow-x-auto">
@@ -184,6 +184,7 @@
                 <div id="winnerEmptyState" class="text-center text-gray-400 text-sm py-8">目前還沒有人抽獎</div>
             </div>
         </section>
+    </div>
 
     <!-- 🔐 新增 / 編輯錢包彈窗 -->
     <div id="walletModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" style="display: none;">
@@ -215,7 +216,6 @@
             databaseURL: "https://daidaikunbao-default-rtdb.firebaseio.com/"
         };
 
-        // 使用獨立的管理員 Firebase App 實例
         const adminApp = initializeApp(firebaseConfig, "adminApp");
         const db = getDatabase(adminApp);
         const auth = getAuth(adminApp);
@@ -337,6 +337,13 @@
                 set(ref(db, "settings/closed"), next).catch(err => alert("❌ 設定失敗：" + err.message));
             });
 
+            // 讀取全域預設
+            onValue(ref(db, "settings/global/maxDrawsPerPlayer"), (snap) => {
+                const val = snap.val();
+                defaultMaxDraws = (val && Number.isInteger(val) && val > 0) ? val : 1;
+                renderPlayerPermList();
+            });
+
             // 讀取遊戲模式
             onValue(ref(db, "settings/global/gameMode"), (snap) => {
                 const mode = snap.val() || "both";
@@ -357,7 +364,7 @@
                 renderPlayerPermList();
             });
 
-            // 讀取扭蛋紀錄 (drawRecords)
+            // 讀取抽獎紀錄 (drawRecords)
             onValue(ref(db, "drawRecords"), (snap) => {
                 drawRecords = snap.val() || {};
                 renderWinnerTable();
@@ -740,84 +747,6 @@
             });
         }
 
-        document.getElementById("addSlotSymbolRowBtn").addEventListener("click", () => {
-            const container = document.getElementById("slotSymbolTable");
-            const row = document.createElement('div');
-            row.className = 'slot-symbol-row';
-            const prizeOptions = Object.keys(currentPrizes).map(pid => `<option value="${escapeAttr(pid)}">${escapeHtml(currentPrizes[pid]?.name || pid)}</option>`).join('');
-            row.innerHTML = `
-                <div class="flex items-center gap-3 flex-wrap">
-                    <div class="flex-shrink-0">
-                        <img src="" alt="新符號" style="width:50px;height:50px;object-fit:contain;background:#f9fafb;border-radius:8px;">
-                    </div>
-                    <div class="flex-grow grid grid-cols-1 md:grid-cols-5 gap-2">
-                        <div><label class="field-label">符號代號</label><input class="field-input slot-symbol-id" value="" placeholder="例如：p1"></div>
-                        <div><label class="field-label">名稱</label><input class="field-input slot-symbol-name" value="" placeholder="例如：星星"></div>
-                        <div><label class="field-label">Emoji</label><input class="field-input slot-symbol-emoji" value="" placeholder="例如：⭐"></div>
-                        <div><label class="field-label">權重</label><input type="number" class="field-input slot-symbol-weight" value="10" min="0"></div>
-                        <div><label class="field-label">對應獎品</label><select class="field-input slot-symbol-prize">${prizeOptions}</select></div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <input type="text" class="field-input slot-symbol-image-url" value="" placeholder="圖片網址" style="width:180px;">
-                        <input type="file" accept="image/*" class="hidden slot-symbol-image-file">
-                        <button class="slot-symbol-upload-btn bg-cyan-100 text-cyan-700 text-xs font-bold px-3 py-1 rounded-lg">📤 上傳</button>
-                        <button class="slot-symbol-delete-btn bg-rose-100 text-rose-600 text-xs font-bold px-3 py-1 rounded-lg">刪除</button>
-                    </div>
-                </div>`;
-            container.appendChild(row);
-
-            const uploadBtn = row.querySelector('.slot-symbol-upload-btn');
-            uploadBtn.addEventListener('click', (e) => {
-                const fileInput = e.target.closest('.slot-symbol-row').querySelector('.slot-symbol-image-file');
-                fileInput.click();
-            });
-            const fileInput = row.querySelector('.slot-symbol-image-file');
-            fileInput.addEventListener('change', async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const urlInput = row.querySelector('.slot-symbol-image-url');
-                const img = row.querySelector('img');
-                const original = urlInput.value;
-                urlInput.value = "⏳ 上傳中…";
-                try {
-                    urlInput.value = await uploadFileToCloudinary(file);
-                    if (img) img.src = urlInput.value;
-                } catch (err) {
-                    alert("❌ 上傳失敗：" + err.message);
-                    urlInput.value = original;
-                } finally {
-                    e.target.value = "";
-                }
-            });
-            const deleteBtn = row.querySelector('.slot-symbol-delete-btn');
-            deleteBtn.addEventListener('click', (e) => {
-                if (!confirm('刪除此符號？')) return;
-                e.target.closest('.slot-symbol-row').remove();
-            });
-        });
-
-        document.getElementById("saveAllSlotSymbolsBtn").addEventListener("click", async () => {
-            const rows = document.querySelectorAll('.slot-symbol-row');
-            const data = {};
-            for (const row of rows) {
-                const id = row.querySelector('.slot-symbol-id').value.trim();
-                if (!id) { alert('有符號未填寫代號'); return; }
-                const name = row.querySelector('.slot-symbol-name').value.trim();
-                const emoji = row.querySelector('.slot-symbol-emoji').value.trim();
-                const weightInput = row.querySelector('.slot-symbol-weight').value;
-                const weight = (weightInput === '' || isNaN(parseInt(weightInput))) ? 10 : parseInt(weightInput);
-                const image = row.querySelector('.slot-symbol-image-url').value.trim();
-                const prizeId = row.querySelector('.slot-symbol-prize').value;
-                data[id] = { name, emoji, weight, image, prizeId };
-            }
-            try {
-                await set(ref(db, "slotSymbols"), data);
-                alert("✅ 已儲存全部符號");
-            } catch (e) {
-                alert("❌ 儲存失敗：" + e.message);
-            }
-        });
-
         // ---------- 錢包管理 ----------
         function renderWalletList() {
             const c = document.getElementById("walletList");
@@ -968,108 +897,108 @@
             await remove(ref(db, `shopItems/${id}`)); alert("✅ 已刪除");
         }
 
-        // ---------- 抽獎紀錄（合併扭蛋與拉霸，皆存在 drawRecords） ----------
+        // ---------- 抽獎紀錄（合併 drawRecords 與 playedUsers） ----------
+        function renderWinnerTable() {
+            const tbody = document.getElementById("winnerTableBody");
+            const empty = document.getElementById("winnerEmptyState");
+            const allRows = [];
+            const seenKeys = new Set();
 
-function renderWinnerTable() {
-    const tbody = document.getElementById("winnerTableBody");
-    const empty = document.getElementById("winnerEmptyState");
-    const allRows = [];
-    const seenKeys = new Set();
+            for (const name in drawRecords) {
+                const records = drawRecords[name];
+                if (!records || typeof records !== 'object') continue;
+                for (const key in records) {
+                    const rec = records[key];
+                    if (!rec || !rec.time) continue;
+                    const uniqueKey = `${name}_${rec.time}_${rec.won || rec.prizeName || ''}`;
+                    if (seenKeys.has(uniqueKey)) continue;
+                    seenKeys.add(uniqueKey);
+                    let typeLabel = '扭蛋';
+                    if (rec.type === 'slot') typeLabel = '拉霸';
+                    else if (rec.type === 'pachinko') typeLabel = '彈珠台';
+                    allRows.push({
+                        user: name,
+                        type: typeLabel,
+                        content: rec.won || rec.prizeName || '',
+                        code: rec.code || '',
+                        time: rec.time,
+                        source: 'drawRecords',
+                        recordKey: key,
+                        playerName: name
+                    });
+                }
+            }
 
-    // 先處理 drawRecords 中的所有紀錄
-    for (const name in drawRecords) {
-        const records = drawRecords[name];
-        if (!records || typeof records !== 'object') continue;
-        for (const key in records) {
-            const rec = records[key];
-            if (!rec || !rec.time) continue;
-            const uniqueKey = `${name}_${rec.time}_${rec.won || rec.prizeName || ''}`;
-            if (seenKeys.has(uniqueKey)) continue;
-            seenKeys.add(uniqueKey);
-            allRows.push({
-                user: name,
-                type: rec.type === 'slot' ? '拉霸' : '扭蛋',
-                content: rec.won || rec.prizeName || '',
-                code: rec.code || '',
-                time: rec.time,
-                source: 'drawRecords',
-                recordKey: key,
-                playerName: name
+            for (const name in currentPlayedUsers) {
+                const u = currentPlayedUsers[name];
+                if (!u || !u.time || !u.won) continue;
+                let isDuplicate = false;
+                for (const row of allRows) {
+                    if (row.user === name && row.content === u.won && Math.abs(row.time - u.time) <= 5000) {
+                        isDuplicate = true;
+                        break;
+                    }
+                }
+                if (isDuplicate) continue;
+                const uniqueKey = `${name}_${u.time}_${u.won}`;
+                if (seenKeys.has(uniqueKey)) continue;
+                seenKeys.add(uniqueKey);
+                allRows.push({
+                    user: name,
+                    type: '扭蛋',
+                    content: u.won,
+                    code: u.code || '',
+                    time: u.time,
+                    source: 'playedUsers',
+                    recordKey: null,
+                    playerName: name
+                });
+            }
+
+            allRows.sort((a, b) => (b.time || 0) - (a.time || 0));
+
+            if (!allRows.length) {
+                tbody.innerHTML = "";
+                empty.classList.remove("hidden");
+                return;
+            }
+            empty.classList.add("hidden");
+
+            tbody.innerHTML = allRows.map((r) => {
+                const timeStr = r.time ? new Date(r.time).toLocaleString("zh-TW") : "-";
+                let typeBadge = 'bg-pink-100 text-pink-700';
+                if (r.type === '拉霸') typeBadge = 'bg-purple-100 text-purple-700';
+                else if (r.type === '彈珠台') typeBadge = 'bg-blue-100 text-blue-700';
+                const deleteBtn = r.source === 'playedUsers'
+                    ? `<button class="delete-winner text-rose-400 text-xs font-bold" data-source="playedUsers" data-player="${escapeAttr(r.playerName)}">刪除玩家全部紀錄</button>`
+                    : `<button class="delete-winner text-rose-400 text-xs font-bold" data-source="drawRecords" data-player="${escapeAttr(r.playerName)}" data-key="${escapeAttr(r.recordKey)}">刪除此筆</button>`;
+                return `<tr class="border-b">
+                    <td class="py-2 font-bold">${escapeHtml(r.user)}</td>
+                    <td><span class="text-xs font-bold px-2 py-1 rounded-full ${typeBadge}">${r.type}</span></td>
+                    <td class="font-bold">${escapeHtml(r.content || "-")}</td>
+                    <td class="break-all">${escapeHtml(r.code || "-")}</td>
+                    <td class="text-xs">${timeStr}</td>
+                    <td>${deleteBtn}</td>
+                </tr>`;
+            }).join("");
+
+            tbody.querySelectorAll(".delete-winner").forEach(btn => {
+                btn.addEventListener("click", async (e) => {
+                    const source = e.target.dataset.source;
+                    const player = e.target.dataset.player;
+                    const key = e.target.dataset.key;
+                    if (source === 'drawRecords' && key) {
+                        if (!confirm(`刪除「${player}」的這筆紀錄？`)) return;
+                        await remove(ref(db, `drawRecords/${player}/${key}`));
+                        alert("✅ 已刪除此筆紀錄");
+                    } else if (source === 'playedUsers') {
+                        if (!confirm(`刪除「${player}」的所有抽獎紀錄？此操作會連同抽獎次數一起清除！`)) return;
+                        await remove(ref(db, `playedUsers/${player}`));
+                        alert("✅ 已刪除該玩家所有紀錄");
+                    }
+                });
             });
         }
-    }
-
-    // 再處理 playedUsers 中未被 drawRecords 覆蓋的紀錄（舊版資料）
-    for (const name in currentPlayedUsers) {
-        const u = currentPlayedUsers[name];
-        if (!u || !u.time || !u.won) continue;
-        // 檢查是否與 drawRecords 中任何一筆時間相近（<= 5 秒）且獎品相同
-        let isDuplicate = false;
-        for (const row of allRows) {
-            if (row.user === name && row.content === u.won && Math.abs(row.time - u.time) <= 5000) {
-                isDuplicate = true;
-                break;
-            }
-        }
-        if (isDuplicate) continue;
-        const uniqueKey = `${name}_${u.time}_${u.won}`;
-        if (seenKeys.has(uniqueKey)) continue;
-        seenKeys.add(uniqueKey);
-        allRows.push({
-            user: name,
-            type: '扭蛋',
-            content: u.won,
-            code: u.code || '',
-            time: u.time,
-            source: 'playedUsers',
-            recordKey: null,
-            playerName: name
-        });
-    }
-
-    // 排序（新的在前）
-    allRows.sort((a, b) => (b.time || 0) - (a.time || 0));
-
-    if (!allRows.length) {
-        tbody.innerHTML = "";
-        empty.classList.remove("hidden");
-        return;
-    }
-    empty.classList.add("hidden");
-
-    tbody.innerHTML = allRows.map((r) => {
-        const timeStr = r.time ? new Date(r.time).toLocaleString("zh-TW") : "-";
-        const typeBadge = r.type === '扭蛋' ? 'bg-pink-100 text-pink-700' : 'bg-purple-100 text-purple-700';
-        const deleteBtn = r.source === 'playedUsers'
-            ? `<button class="delete-winner text-rose-400 text-xs font-bold" data-source="playedUsers" data-player="${escapeAttr(r.playerName)}">刪除玩家全部紀錄</button>`
-            : `<button class="delete-winner text-rose-400 text-xs font-bold" data-source="drawRecords" data-player="${escapeAttr(r.playerName)}" data-key="${escapeAttr(r.recordKey)}">刪除此筆</button>`;
-        return `<tr class="border-b">
-            <td class="py-2 font-bold">${escapeHtml(r.user)}</td>
-            <td><span class="text-xs font-bold px-2 py-1 rounded-full ${typeBadge}">${r.type}</span></td>
-            <td class="font-bold">${escapeHtml(r.content || "-")}</td>
-            <td class="break-all">${escapeHtml(r.code || "-")}</td>
-            <td class="text-xs">${timeStr}</td>
-            <td>${deleteBtn}</td>
-        </tr>`;
-    }).join("");
-
-    tbody.querySelectorAll(".delete-winner").forEach(btn => {
-        btn.addEventListener("click", async (e) => {
-            const source = e.target.dataset.source;
-            const player = e.target.dataset.player;
-            const key = e.target.dataset.key;
-            if (source === 'drawRecords' && key) {
-                if (!confirm(`刪除「${player}」的這筆紀錄？`)) return;
-                await remove(ref(db, `drawRecords/${player}/${key}`));
-                alert("✅ 已刪除此筆紀錄");
-            } else if (source === 'playedUsers') {
-                if (!confirm(`刪除「${player}」的所有抽獎紀錄？此操作會連同抽獎次數一起清除！`)) return;
-                await remove(ref(db, `playedUsers/${player}`));
-                alert("✅ 已刪除該玩家所有紀錄");
-            }
-        });
-    });
-}
 
         function exportWinnersCSV() {
             const rows = [];
@@ -1079,12 +1008,15 @@ function renderWinnerTable() {
                 if (records && typeof records === 'object') {
                     for (const key in records) {
                         const rec = records[key];
-                        const uniqueKey = `${name}_${rec.time}`;
+                        const uniqueKey = `${name}_${rec.time}_${rec.won || ''}`;
                         if (!seen.has(uniqueKey)) {
                             seen.add(uniqueKey);
+                            let typeLabel = '扭蛋';
+                            if (rec.type === 'slot') typeLabel = '拉霸';
+                            else if (rec.type === 'pachinko') typeLabel = '彈珠台';
                             rows.push({
                                 user: name,
-                                type: rec.type === 'slot' ? '拉霸' : '扭蛋',
+                                type: typeLabel,
                                 content: rec.won || rec.prizeName || '',
                                 code: rec.code || '',
                                 time: rec.time
@@ -1095,14 +1027,16 @@ function renderWinnerTable() {
             }
             for (const name in currentPlayedUsers) {
                 const u = currentPlayedUsers[name];
-                if (!u || !u.time) continue;
-                const hasDrawRecord = drawRecords[name] && Object.keys(drawRecords[name]).length > 0;
-                if (!hasDrawRecord) {
-                    const uniqueKey = `${name}_${u.time}`;
-                    if (!seen.has(uniqueKey)) {
-                        seen.add(uniqueKey);
-                        rows.push({ user: name, type: '扭蛋', content: u.won || '', code: u.code || '', time: u.time });
-                    }
+                if (!u || !u.time || !u.won) continue;
+                let isDup = false;
+                for (const r of rows) {
+                    if (r.user === name && r.content === u.won && Math.abs(r.time - u.time) <= 5000) { isDup = true; break; }
+                }
+                if (isDup) continue;
+                const uniqueKey = `${name}_${u.time}_${u.won}`;
+                if (!seen.has(uniqueKey)) {
+                    seen.add(uniqueKey);
+                    rows.push({ user: name, type: '扭蛋', content: u.won, code: u.code || '', time: u.time });
                 }
             }
             rows.sort((a, b) => (b.time || 0) - (a.time || 0));
@@ -1119,6 +1053,85 @@ function renderWinnerTable() {
             a.click();
         }
 
+        // ---------- 新增符號列 ----------
+        document.getElementById("addSlotSymbolRowBtn").addEventListener("click", () => {
+            const container = document.getElementById("slotSymbolTable");
+            const row = document.createElement('div');
+            row.className = 'slot-symbol-row';
+            const prizeOptions = Object.keys(currentPrizes).map(pid => `<option value="${escapeAttr(pid)}">${escapeHtml(currentPrizes[pid]?.name || pid)}</option>`).join('');
+            row.innerHTML = `
+                <div class="flex items-center gap-3 flex-wrap">
+                    <div class="flex-shrink-0">
+                        <img src="" alt="新符號" style="width:50px;height:50px;object-fit:contain;background:#f9fafb;border-radius:8px;">
+                    </div>
+                    <div class="flex-grow grid grid-cols-1 md:grid-cols-5 gap-2">
+                        <div><label class="field-label">符號代號</label><input class="field-input slot-symbol-id" value="" placeholder="例如：p1"></div>
+                        <div><label class="field-label">名稱</label><input class="field-input slot-symbol-name" value="" placeholder="例如：星星"></div>
+                        <div><label class="field-label">Emoji</label><input class="field-input slot-symbol-emoji" value="" placeholder="例如：⭐"></div>
+                        <div><label class="field-label">權重</label><input type="number" class="field-input slot-symbol-weight" value="10" min="0"></div>
+                        <div><label class="field-label">對應獎品</label><select class="field-input slot-symbol-prize">${prizeOptions}</select></div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="text" class="field-input slot-symbol-image-url" value="" placeholder="圖片網址" style="width:180px;">
+                        <input type="file" accept="image/*" class="hidden slot-symbol-image-file">
+                        <button class="slot-symbol-upload-btn bg-cyan-100 text-cyan-700 text-xs font-bold px-3 py-1 rounded-lg">📤 上傳</button>
+                        <button class="slot-symbol-delete-btn bg-rose-100 text-rose-600 text-xs font-bold px-3 py-1 rounded-lg">刪除</button>
+                    </div>
+                </div>`;
+            container.appendChild(row);
+
+            const uploadBtn = row.querySelector('.slot-symbol-upload-btn');
+            uploadBtn.addEventListener('click', (e) => {
+                const fileInput = e.target.closest('.slot-symbol-row').querySelector('.slot-symbol-image-file');
+                fileInput.click();
+            });
+            const fileInput = row.querySelector('.slot-symbol-image-file');
+            fileInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const urlInput = row.querySelector('.slot-symbol-image-url');
+                const img = row.querySelector('img');
+                const original = urlInput.value;
+                urlInput.value = "⏳ 上傳中…";
+                try {
+                    urlInput.value = await uploadFileToCloudinary(file);
+                    if (img) img.src = urlInput.value;
+                } catch (err) {
+                    alert("❌ 上傳失敗：" + err.message);
+                    urlInput.value = original;
+                } finally {
+                    e.target.value = "";
+                }
+            });
+            const deleteBtn = row.querySelector('.slot-symbol-delete-btn');
+            deleteBtn.addEventListener('click', (e) => {
+                if (!confirm('刪除此符號？')) return;
+                e.target.closest('.slot-symbol-row').remove();
+            });
+        });
+
+        // ---------- 儲存所有符號 ----------
+        document.getElementById("saveAllSlotSymbolsBtn").addEventListener("click", async () => {
+            const rows = document.querySelectorAll('.slot-symbol-row');
+            const data = {};
+            for (const row of rows) {
+                const id = row.querySelector('.slot-symbol-id').value.trim();
+                if (!id) { alert('有符號未填寫代號'); return; }
+                const name = row.querySelector('.slot-symbol-name').value.trim();
+                const emoji = row.querySelector('.slot-symbol-emoji').value.trim();
+                const weightInput = row.querySelector('.slot-symbol-weight').value;
+                const weight = (weightInput === '' || isNaN(parseInt(weightInput))) ? 10 : parseInt(weightInput);
+                const image = row.querySelector('.slot-symbol-image-url').value.trim();
+                const prizeId = row.querySelector('.slot-symbol-prize').value;
+                data[id] = { name, emoji, weight, image, prizeId };
+            }
+            try {
+                await set(ref(db, "slotSymbols"), data);
+                alert("✅ 已儲存全部符號");
+            } catch (e) {
+                alert("❌ 儲存失敗：" + e.message);
+            }
+        });
 
         // ---------- 初始事件綁定 ----------
         document.addEventListener("DOMContentLoaded", () => {
@@ -1144,4 +1157,4 @@ function renderWinnerTable() {
         });
     </script>
 </body>
-</html> 
+</html>
