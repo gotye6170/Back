@@ -87,10 +87,20 @@
             <div class="setting-card mt-4">
                 <label class="field-label mb-2">🐹 倉鼠大放送設定</label>
                 <p class="text-[11px] text-gray-500 mb-3">指定一隻倉鼠在彈珠台自由走動。彈珠碰到倉鼠時，玩家直接獲得此獎品。選「（關閉倉鼠）」即停用。</p>
-                <div class="flex items-center gap-3 flex-wrap">
+                <div class="flex items-center gap-3 flex-wrap mb-3">
+                    <label class="text-xs font-bold text-gray-500 flex-shrink-0">獎品：</label>
                     <select id="hamsterPrizeSelect" class="field-input flex-grow" style="max-width:320px;">
                         <option value="">（關閉倉鼠）</option>
                     </select>
+                </div>
+                <div class="flex items-center gap-3 flex-wrap mb-3">
+                    <label class="text-xs font-bold text-gray-500 flex-shrink-0">倉鼠圖片：</label>
+                    <input type="text" id="hamsterImageUrl" class="field-input flex-grow" placeholder="留空＝使用預設倉鼠繪圖" style="max-width:400px;">
+                    <button id="uploadHamsterImageBtn" type="button" class="bg-cyan-100 text-cyan-700 text-xs font-bold px-3 py-2 rounded-lg">📤 上傳</button>
+                    <input type="file" accept="image/*" id="hamsterImageFileInput" style="display:none">
+                    <img id="hamsterImagePreview" src="" alt="" style="width:48px;height:48px;object-fit:contain;background:#f9fafb;border-radius:8px;display:none;">
+                </div>
+                <div class="flex items-center gap-3 flex-wrap">
                     <button id="saveHamsterBtn" type="button" class="bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold px-6 py-2 rounded-xl">💾 儲存倉鼠設定</button>
                 </div>
                 <p id="hamsterCurrentInfo" class="text-[11px] text-gray-400 mt-2"></p>
@@ -311,6 +321,7 @@
         let dbListenersStarted = false;
         let defaultMaxDraws = 1;
         let currentHamsterPrizeId = "";
+        let currentHamsterImageUrl = "";
 
         // ---------- 通用輔助 ----------
         function escapeHtml(str) { return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
@@ -424,6 +435,7 @@
                 document.getElementById("pachinkoBinsInput").value = data.bins || 7;
                 binLayout = Array.isArray(data.binLayout) ? data.binLayout.slice() : [];
                 currentHamsterPrizeId = data.hamsterPrizeId || "";
+                currentHamsterImageUrl = data.hamsterImageUrl || "";
                 renderBinLayoutEditor();
                 renderHamsterSelect();
             });
@@ -530,6 +542,12 @@
             ).join("");
             sel.innerHTML = options;
 
+            const urlInput = document.getElementById("hamsterImageUrl");
+            if (urlInput && document.activeElement !== urlInput) {
+                urlInput.value = currentHamsterImageUrl || "";
+            }
+            updateHamsterPreview();
+
             const info = document.getElementById("hamsterCurrentInfo");
             if (info) {
                 if (currentHamsterPrizeId && currentPrizes[currentHamsterPrizeId]) {
@@ -539,6 +557,20 @@
                 } else {
                     info.innerText = "目前倉鼠關閉中";
                 }
+            }
+        }
+
+        function updateHamsterPreview() {
+            const preview = document.getElementById("hamsterImagePreview");
+            const urlInput = document.getElementById("hamsterImageUrl");
+            if (!preview || !urlInput) return;
+            const url = urlInput.value.trim();
+            if (url) {
+                preview.src = url;
+                preview.style.display = "block";
+            } else {
+                preview.src = "";
+                preview.style.display = "none";
             }
         }
 
@@ -1376,6 +1408,35 @@
             }
         });
 
+        // ---------- 倉鼠圖片上傳 ----------
+        document.getElementById("uploadHamsterImageBtn").addEventListener("click", () => {
+            document.getElementById("hamsterImageFileInput").click();
+        });
+
+        document.getElementById("hamsterImageFileInput").addEventListener("change", async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const urlInput = document.getElementById("hamsterImageUrl");
+            const original = urlInput.value;
+            urlInput.value = "⏳ 上傳中…";
+            urlInput.disabled = true;
+            try {
+                const url = await uploadFileToCloudinary(file);
+                urlInput.value = url;
+                updateHamsterPreview();
+            } catch (err) {
+                alert("❌ 上傳失敗：" + err.message);
+                urlInput.value = original;
+            } finally {
+                urlInput.disabled = false;
+                e.target.value = "";
+            }
+        });
+
+        document.getElementById("hamsterImageUrl").addEventListener("input", () => {
+            updateHamsterPreview();
+        });
+
         // ---------- 初始事件綁定 ----------
         document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("loginBtn").addEventListener("click", tryAdminLogin);
@@ -1388,9 +1449,14 @@
             document.getElementById("exportCSVBtn").addEventListener("click", exportWinnersCSV);
             document.getElementById("saveHamsterBtn").addEventListener("click", async () => {
                 const val = document.getElementById("hamsterPrizeSelect").value;
+                const imgUrl = document.getElementById("hamsterImageUrl").value.trim();
                 try {
-                    if (val) await set(ref(db, "settings/pachinko/hamsterPrizeId"), val);
-                    else await remove(ref(db, "settings/pachinko/hamsterPrizeId"));
+                    const updates = {};
+                    if (val) updates.hamsterPrizeId = val;
+                    if (imgUrl) updates.hamsterImageUrl = imgUrl;
+                    await update(ref(db, "settings/pachinko"), updates);
+                    if (!val) await remove(ref(db, "settings/pachinko/hamsterPrizeId"));
+                    if (!imgUrl) await remove(ref(db, "settings/pachinko/hamsterImageUrl"));
                     alert("✅ 倉鼠設定已儲存");
                 } catch (e) {
                     alert("❌ 儲存失敗：" + e.message);
