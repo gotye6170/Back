@@ -88,6 +88,7 @@
                 <div id="binLayoutEditor" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 mb-3"></div>
                 <button id="saveBinLayoutBtn" type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2 rounded-xl">💾 儲存格子配置</button>
             </div>
+
             <div class="flex gap-2 mt-4">
                 <button id="saveGameSettingsBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2 rounded-xl transition-all">💾 儲存遊戲設定</button>
             </div>
@@ -98,7 +99,7 @@
         <section class="bg-white/70 rounded-3xl border border-white shadow p-5 md:p-6">
             <h2 class="font-black text-slate-700 mb-4">🔊 音效設定</h2>
             <p class="text-xs text-gray-500 mb-3">上傳 mp3 音效檔，玩家端將播放這些音效。留空則使用預設合成音效。</p>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <div class="setting-card">
                     <label class="field-label">扭蛋轉動音效</label>
                     <div class="flex gap-2">
@@ -129,6 +130,14 @@
                         <input type="text" id="soundPachinkoUrl" class="field-input" placeholder="音效網址">
                         <button id="uploadPachinkoSoundBtn" class="bg-cyan-100 text-cyan-700 text-xs font-bold px-3 rounded-lg">📤 上傳</button>
                         <input type="file" accept="audio/*" id="pachinkoSoundFileInput" style="display:none">
+                    </div>
+                </div>
+                <div class="setting-card">
+                    <label class="field-label">釘子碰撞音效</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="soundPegUrl" class="field-input" placeholder="音效網址">
+                        <button id="uploadPegSoundBtn" class="bg-cyan-100 text-cyan-700 text-xs font-bold px-3 rounded-lg">📤 上傳</button>
+                        <input type="file" accept="audio/*" id="pegSoundFileInput" style="display:none">
                     </div>
                 </div>
             </div>
@@ -202,6 +211,7 @@
                 <h2 class="font-black text-slate-700">👑 抽獎紀錄（扭蛋機 + 拉霸機 + 彈珠台）</h2>
                 <button id="exportCSVBtn" class="bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">⬇ 匯出 CSV</button>
             </div>
+            <p class="text-xs text-gray-500 mb-3">勾選「顯示」欄位的紀錄才會出現在玩家首頁的「幸運中獎者」；全部取消勾選則回復為顯示全部。</p>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
@@ -222,96 +232,7 @@
         </section>
     </div>
 
-    <!-- 🔀 選擇模式彈窗 -->
-    <div id="choiceModal" class="modal-overlay" style="display: none;">
-        <div class="modal-card p-6 text-center">
-            <h2 class="text-xl font-black text-slate-800 mb-1">👋 你好，<span id="choicePlayerName" class="text-rose-500"></span>！</h2>
-            <p class="text-sm text-gray-500 mb-5">請選擇你要進行的項目</p>
-            <div class="space-y-3">
-                <button onclick="chooseDraw()" class="choice-btn choice-btn-draw w-full">
-                    <span class="text-2xl">🟡</span>
-                    <span>扭蛋機</span>
-                </button>
-                <button onclick="chooseSlot()" class="choice-btn choice-btn-slot w-full">
-                    <span class="text-2xl">🎰</span>
-                    <span>拉霸機</span>
-                </button>
-                <button onclick="choosePachinko()" class="choice-btn choice-btn-pachinko w-full">
-                    <span class="text-2xl">🎱</span>
-                    <span>彈珠台</span>
-                </button>
-                <button onclick="choosePoints()" class="choice-btn choice-btn-points w-full">
-                    <span class="text-2xl">🎁</span>
-                    <span>點數兌換系統</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ❓ 扭蛋確認彈窗 -->
-    <div id="confirmModal" class="modal-overlay" style="display: none;">
-        <div class="modal-card p-6 text-center border-4 border-rose-300">
-            <h2 class="text-xl font-black text-slate-800 mb-2">🎯 確定要抽獎嗎？</h2>
-            <p class="text-sm text-gray-500 mb-6">每個名字只能抽一次，送出後無法反悔喔！</p>
-            <div class="flex gap-3">
-                <button onclick="closeConfirmModal()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 rounded-xl text-base transition-all">再想一下</button>
-                <button onclick="confirmAndDraw()" class="flex-1 bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white font-bold py-3 rounded-xl text-base transition-all">確定抽獎</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 🏆 獲獎彈窗（扭蛋、拉霸、彈珠台共用） -->
-    <div id="winModal" class="modal-overlay" style="display: none;">
-        <div class="modal-card p-6 text-center border-4 border-amber-400">
-            <h2 id="modalTitle" class="text-2xl font-black text-rose-500 mb-2">🎉 恭喜中獎！</h2>
-            <div class="bg-amber-50 rounded-2xl p-4 my-4 border border-amber-200">
-                <p class="text-xs text-amber-600 font-bold tracking-wider mb-1">🎁 抽中獎品</p>
-                <p id="modalPrizeName" class="text-xl font-extrabold text-slate-800">載入中...</p>
-                <p id="modalPointsInfo" class="text-sm font-bold text-amber-600 mt-1 hidden"></p>
-            </div>
-            <div id="modalTicketCode" onclick="clickTicket()" class="bg-slate-900 text-cyan-400 font-mono text-base font-bold py-3 px-4 rounded-xl cursor-pointer hover:bg-slate-800 active:scale-98 transition-all border border-cyan-500/30 break-all select-none">點我打開獎品連結</div>
-            <p id="copyHint" class="text-[11px] text-gray-400 mt-1.5 font-medium">💡 點擊上方即可查看獎品</p>
-            <button onclick="closeModal()" class="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl text-base transition-all mt-4">收下好禮</button>
-        </div>
-    </div>
-
-    <!-- 🔐 錢包密語彈窗 -->
-    <div id="walletPassModal" class="modal-overlay" style="display: none;">
-        <div class="modal-card p-6 text-center border-4 border-yellow-400">
-            <h2 class="text-xl font-black text-slate-800 mb-2">🔐 解鎖點數錢包</h2>
-            <p class="text-sm text-gray-500 mb-4">請輸入 <b id="walletPassName"></b> 的個人錢包密語</p>
-            <input type="password" id="personalPassInput" placeholder="輸入個人密語" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-base font-semibold text-center focus:outline-none focus:ring-2 focus:ring-yellow-400 transition-all mb-4">
-            <div class="flex gap-3">
-                <button onclick="closeWalletPassModal()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 rounded-xl text-base transition-all">取消</button>
-                <button onclick="verifyPersonalPass()" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 rounded-xl text-base transition-all">解鎖錢包</button>
-            </div>
-            <p id="walletPassError" class="text-xs text-rose-500 mt-3"></p>
-        </div>
-    </div>
-
-    <!-- 🛍️ 商品專區彈窗 -->
-    <div id="shopModal" class="modal-overlay" style="display: none;">
-        <div class="modal-card p-6 max-w-lg flex flex-col max-h-[85vh]">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-black text-slate-800">🛍️ 商品專區</h2>
-                <button onclick="closeShop()" class="text-gray-400 hover:text-gray-600 text-3xl leading-none">&times;</button>
-            </div>
-            <div class="flex items-center gap-2 mb-4">
-                <span class="wallet-badge text-sm" id="shopWalletDisplay">🪙 0 點</span>
-                <span class="text-xs text-gray-400">可用點數</span>
-            </div>
-            <div class="flex gap-2 mb-3">
-                <button id="tabShopItems" class="tab-btn text-xs font-bold px-3 py-2 rounded-lg bg-emerald-100 text-emerald-700 flex-1">商品列表</button>
-                <button id="tabPointsHistory" class="tab-btn text-xs font-bold px-3 py-2 rounded-lg bg-gray-100 text-gray-500 flex-1">點數記錄</button>
-                <button id="tabRedeemHistory" class="tab-btn text-xs font-bold px-3 py-2 rounded-lg bg-gray-100 text-gray-500 flex-1">兌換記錄</button>
-            </div>
-            <div id="shopItemList" class="overflow-y-auto flex-grow space-y-3 pr-1"><p class="text-gray-400 text-sm text-center">載入商品中...</p></div>
-            <div id="pointsHistoryList" class="hidden overflow-y-auto flex-grow space-y-2 pr-1"><p class="text-gray-400 text-sm text-center">尚無點數記錄</p></div>
-            <div id="redeemHistoryList" class="hidden overflow-y-auto flex-grow space-y-2 pr-1"><p class="text-gray-400 text-sm text-center">尚無兌換記錄</p></div>
-        </div>
-    </div>
-
-    <!-- 💰 錢包編輯彈窗（新增） -->
+    <!-- 💰 錢包編輯彈窗 -->
     <div id="walletModal" style="display:none; position:fixed; inset:0; z-index:50; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; padding:20px;">
         <div style="background:white; border-radius:24px; width:100%; max-width:400px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.3); border:4px solid #67e8f9;">
             <h2 id="walletModalTitle" class="text-lg font-black text-slate-800 mb-4 text-center">編輯玩家錢包</h2>
@@ -344,9 +265,6 @@
             </div>
         </div>
     </div>
-
-    <!-- 🔊 音效開關 -->
-    <button id="soundToggleBtn" onclick="toggleSound()" class="music-control-btn fixed bottom-5 right-5 bg-slate-900 text-cyan-400 text-sm font-bold px-4 py-2 rounded-full shadow-lg border border-cyan-500/30 z-40 transition-all active:scale-95">🔊 音效</button>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
@@ -507,6 +425,7 @@
                 document.getElementById("soundWinUrl").value = data.win || "";
                 document.getElementById("soundSlotUrl").value = data.slot || "";
                 document.getElementById("soundPachinkoUrl").value = data.pachinko || "";
+                document.getElementById("soundPegUrl").value = data.peg || "";
             });
 
             onValue(ref(db, "drawLimits"), (snap) => {
@@ -693,12 +612,20 @@
             uploadSoundFile(e.target, document.getElementById("soundPachinkoUrl"));
         });
 
+        document.getElementById("uploadPegSoundBtn").addEventListener("click", () => {
+            document.getElementById("pegSoundFileInput").click();
+        });
+        document.getElementById("pegSoundFileInput").addEventListener("change", (e) => {
+            uploadSoundFile(e.target, document.getElementById("soundPegUrl"));
+        });
+
         document.getElementById("saveSoundsBtn").addEventListener("click", async () => {
             const data = {
                 crank: document.getElementById("soundCrankUrl").value.trim(),
                 win: document.getElementById("soundWinUrl").value.trim(),
                 slot: document.getElementById("soundSlotUrl").value.trim(),
-                pachinko: document.getElementById("soundPachinkoUrl").value.trim()
+                pachinko: document.getElementById("soundPachinkoUrl").value.trim(),
+                peg: document.getElementById("soundPegUrl").value.trim()
             };
             try {
                 await set(ref(db, "settings/sounds"), data);
@@ -937,7 +864,7 @@
             Promise.all([remove(ref(db, "prizes/"+id)), remove(ref(db, "prizeCodes/"+id))]).catch(e=>alert("❌ "+e.message));
         }
 
-        // ---------- 拉霸機符號管理（含獎品選擇下拉） ----------
+        // ---------- 拉霸機符號管理 ----------
         function renderSlotSymbolTable() {
             const container = document.getElementById("slotSymbolTable");
             const ids = Object.keys(slotSymbols);
@@ -1157,7 +1084,7 @@
             await remove(ref(db, `shopItems/${id}`)); alert("✅ 已刪除");
         }
 
-        // ---------- 抽獎紀錄（合併 drawRecords 與 playedUsers） ----------
+        // ---------- 抽獎紀錄 ----------
         function renderWinnerTable() {
             const tbody = document.getElementById("winnerTableBody");
             const empty = document.getElementById("winnerEmptyState");
