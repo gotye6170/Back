@@ -197,6 +197,7 @@
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="text-left text-gray-400 text-xs border-b">
+                            <th class="py-2 pr-4">顯示</th>
                             <th class="py-2 pr-4">姓名</th>
                             <th class="py-2 pr-4">類型</th>
                             <th class="py-2 pr-4">內容</th>
@@ -1165,7 +1166,8 @@
                         time: rec.time,
                         source: 'drawRecords',
                         recordKey: key,
-                        playerName: name
+                        playerName: name,
+                        showOnBoard: rec.showOnBoard === true
                     });
                 }
             }
@@ -1192,7 +1194,8 @@
                     time: u.time,
                     source: 'playedUsers',
                     recordKey: null,
-                    playerName: name
+                    playerName: name,
+                    showOnBoard: false
                 });
             }
 
@@ -1213,7 +1216,13 @@
                 const deleteBtn = r.source === 'playedUsers'
                     ? `<button class="delete-winner text-rose-400 text-xs font-bold" data-source="playedUsers" data-player="${escapeAttr(r.playerName)}">刪除玩家全部紀錄</button>`
                     : `<button class="delete-winner text-rose-400 text-xs font-bold" data-source="drawRecords" data-player="${escapeAttr(r.playerName)}" data-key="${escapeAttr(r.recordKey)}">刪除此筆</button>`;
+
+                const checkboxCell = r.source === 'drawRecords'
+                    ? `<input type="checkbox" class="show-on-board cursor-pointer w-4 h-4" data-player="${escapeAttr(r.playerName)}" data-key="${escapeAttr(r.recordKey)}" ${r.showOnBoard ? 'checked' : ''}>`
+                    : `<span class="text-gray-300 text-xs">-</span>`;
+
                 return `<tr class="border-b">
+                    <td class="py-2 pr-4">${checkboxCell}</td>
                     <td class="py-2 font-bold">${escapeHtml(r.user)}</td>
                     <td><span class="text-xs font-bold px-2 py-1 rounded-full ${typeBadge}">${r.type}</span></td>
                     <td class="font-bold">${escapeHtml(r.content || "-")}</td>
@@ -1222,6 +1231,24 @@
                     <td>${deleteBtn}</td>
                 </tr>`;
             }).join("");
+
+            tbody.querySelectorAll(".show-on-board").forEach(cb => {
+                cb.addEventListener("change", async (e) => {
+                    const player = e.target.dataset.player;
+                    const key = e.target.dataset.key;
+                    const checked = e.target.checked;
+                    try {
+                        if (checked) {
+                            await set(ref(db, `drawRecords/${player}/${key}/showOnBoard`), true);
+                        } else {
+                            await remove(ref(db, `drawRecords/${player}/${key}/showOnBoard`));
+                        }
+                    } catch (err) {
+                        alert("更新失敗：" + err.message);
+                        e.target.checked = !checked;
+                    }
+                });
+            });
 
             tbody.querySelectorAll(".delete-winner").forEach(btn => {
                 btn.addEventListener("click", async (e) => {
