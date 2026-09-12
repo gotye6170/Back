@@ -83,6 +83,19 @@
                 <button id="saveBinLayoutBtn" type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2 rounded-xl">💾 儲存格子配置</button>
             </div>
 
+            <!-- 🐹 倉鼠設定 -->
+            <div class="setting-card mt-4">
+                <label class="field-label mb-2">🐹 倉鼠大放送設定</label>
+                <p class="text-[11px] text-gray-500 mb-3">指定一隻倉鼠在彈珠台自由走動。彈珠碰到倉鼠時，玩家直接獲得此獎品。選「（關閉倉鼠）」即停用。</p>
+                <div class="flex items-center gap-3 flex-wrap">
+                    <select id="hamsterPrizeSelect" class="field-input flex-grow" style="max-width:320px;">
+                        <option value="">（關閉倉鼠）</option>
+                    </select>
+                    <button id="saveHamsterBtn" type="button" class="bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold px-6 py-2 rounded-xl">💾 儲存倉鼠設定</button>
+                </div>
+                <p id="hamsterCurrentInfo" class="text-[11px] text-gray-400 mt-2"></p>
+            </div>
+
             <div class="flex gap-2 mt-4">
                 <button id="saveGameSettingsBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2 rounded-xl transition-all">💾 儲存遊戲設定</button>
             </div>
@@ -297,6 +310,7 @@
         let editingPrizeIds = new Set();
         let dbListenersStarted = false;
         let defaultMaxDraws = 1;
+        let currentHamsterPrizeId = "";
 
         // ---------- 通用輔助 ----------
         function escapeHtml(str) { return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
@@ -409,7 +423,9 @@
                 const data = snap.val() || {};
                 document.getElementById("pachinkoBinsInput").value = data.bins || 7;
                 binLayout = Array.isArray(data.binLayout) ? data.binLayout.slice() : [];
+                currentHamsterPrizeId = data.hamsterPrizeId || "";
                 renderBinLayoutEditor();
+                renderHamsterSelect();
             });
 
             onValue(ref(db, "settings/sounds"), (snap) => {
@@ -441,6 +457,7 @@
                 renderPrizeList();
                 renderSlotSymbolTable();
                 renderBinLayoutEditor();
+                renderHamsterSelect();
             }, (err) => { console.error(err); });
             onValue(ref(db, "prizeCodes"), (snapshot) => { currentPrizeCodes = snapshot.val() || {}; renderPrizeList(); });
             onValue(ref(db, "playedUsers"), (snapshot) => { currentPlayedUsers = snapshot.val() || {}; renderWinnerTable(); renderPlayerPermList(); });
@@ -502,6 +519,29 @@
             });
         }
 
+        function renderHamsterSelect() {
+            const sel = document.getElementById("hamsterPrizeSelect");
+            if (!sel) return;
+            const prizeIds = Object.keys(currentPrizes);
+            const options = ['<option value="">（關閉倉鼠）</option>'].concat(
+                prizeIds.map(pid =>
+                    `<option value="${escapeAttr(pid)}" ${currentHamsterPrizeId === pid ? 'selected' : ''}>${escapeHtml(currentPrizes[pid]?.name || pid)}</option>`
+                )
+            ).join("");
+            sel.innerHTML = options;
+
+            const info = document.getElementById("hamsterCurrentInfo");
+            if (info) {
+                if (currentHamsterPrizeId && currentPrizes[currentHamsterPrizeId]) {
+                    info.innerText = `目前啟用：${currentPrizes[currentHamsterPrizeId].name}（${currentHamsterPrizeId}）`;
+                } else if (currentHamsterPrizeId) {
+                    info.innerText = `⚠️ 指定的獎品「${currentHamsterPrizeId}」不存在，倉鼠不會出現`;
+                } else {
+                    info.innerText = "目前倉鼠關閉中";
+                }
+            }
+        }
+
         document.getElementById("applyBinCountBtn").addEventListener("click", () => {
             renderBinLayoutEditor();
         });
@@ -547,7 +587,7 @@
                 if (!confirm("有格子未指定獎品，確定要儲存嗎？")) return;
             }
             try {
-                await set(ref(db, "settings/pachinko"), { bins: count, binLayout: binLayout });
+                await update(ref(db, "settings/pachinko"), { bins: count, binLayout: binLayout });
                 alert("✅ 已儲存格子配置");
             } catch (e) { alert("❌ 儲存失敗：" + e.message); }
         });
@@ -850,6 +890,7 @@
             Promise.all([remove(ref(db, "prizes/"+id)), remove(ref(db, "prizeCodes/"+id))]).catch(e=>alert("❌ "+e.message));
         }
 
+
         // ---------- 拉霸機符號管理 ----------
         function renderSlotSymbolTable() {
             const container = document.getElementById("slotSymbolTable");
@@ -1089,6 +1130,7 @@
                     let typeLabel = '扭蛋';
                     if (rec.type === 'slot') typeLabel = '拉霸';
                     else if (rec.type === 'pachinko') typeLabel = '彈珠台';
+                    else if (rec.type === 'pachinko-hamster') typeLabel = '🐹 倉鼠';
                     allRows.push({
                         user: name,
                         type: typeLabel,
@@ -1144,6 +1186,7 @@
                 let typeBadge = 'bg-pink-100 text-pink-700';
                 if (r.type === '拉霸') typeBadge = 'bg-purple-100 text-purple-700';
                 else if (r.type === '彈珠台') typeBadge = 'bg-blue-100 text-blue-700';
+                else if (r.type === '🐹 倉鼠') typeBadge = 'bg-amber-100 text-amber-700';
                 const deleteBtn = r.source === 'playedUsers'
                     ? `<button class="delete-winner text-rose-400 text-xs font-bold" data-source="playedUsers" data-player="${escapeAttr(r.playerName)}">刪除玩家全部紀錄</button>`
                     : `<button class="delete-winner text-rose-400 text-xs font-bold" data-source="drawRecords" data-player="${escapeAttr(r.playerName)}" data-key="${escapeAttr(r.recordKey)}">刪除此筆</button>`;
@@ -1213,6 +1256,7 @@
                             let typeLabel = '扭蛋';
                             if (rec.type === 'slot') typeLabel = '拉霸';
                             else if (rec.type === 'pachinko') typeLabel = '彈珠台';
+                            else if (rec.type === 'pachinko-hamster') typeLabel = '🐹 倉鼠';
                             rows.push({
                                 user: name,
                                 type: typeLabel,
@@ -1342,6 +1386,16 @@
             document.getElementById("saveWalletBtn").addEventListener("click", saveWallet);
             document.getElementById("addShopItemBtn").addEventListener("click", addNewShopItem);
             document.getElementById("exportCSVBtn").addEventListener("click", exportWinnersCSV);
+            document.getElementById("saveHamsterBtn").addEventListener("click", async () => {
+                const val = document.getElementById("hamsterPrizeSelect").value;
+                try {
+                    if (val) await set(ref(db, "settings/pachinko/hamsterPrizeId"), val);
+                    else await remove(ref(db, "settings/pachinko/hamsterPrizeId"));
+                    alert("✅ 倉鼠設定已儲存");
+                } catch (e) {
+                    alert("❌ 儲存失敗：" + e.message);
+                }
+            });
         });
 
         onAuthStateChanged(auth, (user) => {
